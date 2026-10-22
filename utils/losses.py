@@ -9,7 +9,7 @@ def nt_xent_loss(z_i, z_j, temperature=0.5):
     similarity = torch.matmul(z, z.T)
     N = z_i.shape[0]
 
-    mask = (~torch.eye(2*N, dtype=bool)).to(z.device)
+    mask = (~torch.eye(2 * N, dtype=bool)).to(z.device)
     sim = similarity / temperature
     exp_sim = torch.exp(sim) * mask
 
