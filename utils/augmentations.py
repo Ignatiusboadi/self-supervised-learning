@@ -1,7 +1,7 @@
 import torchvision.transforms as transforms
 
 
-def simclr_transforms():
+def simclr_train_transforms():
     simclr_transform = transforms.Compose([
         transforms.RandomResizedCrop(32),
         transforms.RandomHorizontalFlip(),
