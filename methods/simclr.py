@@ -18,3 +18,4 @@ class SimCLRModel(nn.Module):
         h = self.encoder(x)
         z = self.projection_head(h)
         return z
+    
