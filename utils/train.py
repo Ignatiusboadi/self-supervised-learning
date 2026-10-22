@@ -1,31 +1,42 @@
 import torch
 from tqdm import tqdm
 
+from utils.lr_schedulers import cosine_lr_with_warmup
+from utils.losses import nt_xent_loss
 
-def training_epoch(model, train_loader, optimizer, loss_function, device,
-                   epoch, num_epochs, silent=False, ):
+
+def train_one_epoch(model, train_loader, optimizer, device, global_step,
+    total_steps, warmup_steps, peak_lr, epoch, num_epochs, temperature=0.5, ):
     model.train()
 
     running_loss = 0.0
-    train_loader_tqdm = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs} - Training",
-                             leave=False, disable=silent, )
+    total_samples = 0
+    learning_rates = []
 
-    for i, (x_i, x_j) in enumerate(train_loader_tqdm):
-        x_i, x_j = x_i.to(device), x_j.to(device)
+    progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs}",)
+
+    for x_i, x_j in progress_bar:
+        x_i = x_i.to(device, non_blocking=True)
+        x_j = x_j.to(device, non_blocking=True)
+
+        lr = cosine_lr_with_warmup(optimizer=optimizer, step=global_step, total_steps=total_steps,
+            warmup_steps=warmup_steps, peak_lr=peak_lr, )
+
+        optimizer.zero_grad(set_to_none=True)
+
         z_i = model(x_i)
         z_j = model(x_j)
 
-        loss = loss_function(z_i, z_j)
-        optimizer.zero_grad()
+        loss = nt_xent_loss(z_i, z_j, temperature=temperature, )
         loss.backward()
         optimizer.step()
-        running_loss += loss.item()
 
-        if not silent:
-            train_loader_tqdm.set_postfix(loss=loss.item(), refresh=False)
+        current_batch_size = x_i.size(0)
+        running_loss += loss.item() * current_batch_size
+        total_samples += current_batch_size
+        learning_rates.append(lr)
+        progress_bar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{lr:.6f}", )
+        global_step += 1
 
-        # if ((i + 1) % 45 == 0) & (not silent):
-        #     print(f"Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {loss.item():.4f}")
-
-    epoch_loss = running_loss / len(train_loader)
-    return epoch_loss
+    epoch_loss = running_loss / total_samples if total_samples else 0.0
+    return epoch_loss, learning_rates, global_step
