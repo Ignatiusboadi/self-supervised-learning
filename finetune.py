@@ -1,24 +1,36 @@
 import json
+from pathlib import Path
+
 import torch
 
-from pathlib import Path
 from data_pipeline.finetuning_data import get_finetuning_loaders
 from training.finetuning import load_pretrained, fit_finetuning
+from utils.distributed import Runtime
 from utils.evaluation import evaluate_model
 from utils.plotting import plot_fig
 
 
-def run_finetuning(args, device):
-    root = Path(args.root_dir)
-    output_root = Path(args.output_dir or f"{root}/outputs")
-    plot_dir = output_root / "plots"
-    output_root = output_root / "finetuning_outputs"
+def run_finetuning(args, runtime: Runtime):
+    if runtime.distributed:
+        raise NotImplementedError(
+            "Distributed fine-tuning requires distributed samplers, "
+            "rank-safe checkpoint saving, and distributed-aware evaluation."
+        )
 
-    data_dir = Path(args.data_path or str(root / "data" / args.data))
+    device = runtime.device
+    root = Path(args.root_dir)
+    base_output_dir = Path(args.output_dir or root / "outputs")
+    plot_dir = base_output_dir / "plots"
+    output_root = base_output_dir / "finetuning_outputs"
+
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    data_dir = Path(args.data_path or root / "data" / args.data)
 
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
-        checkpoint_path = str(
+        checkpoint_path = (
             root / "outputs" / "checkpoints" / args.ssl_type
             / f"simclr_{args.model}_encoder.pth"
         )
@@ -32,26 +44,17 @@ def run_finetuning(args, device):
 
     num_epochs = args.epochs if args.epochs is not None else 30
     batch_size = args.batch_size if args.batch_size is not None else 128
-    learning_rate = (
-        args.learning_rate
-        if args.learning_rate is not None
-        else 0.001
-    )
-    weight_decay = (
-        args.weight_decay
-        if args.weight_decay is not None
-        else 5e-4
-    )
-
+    learning_rate = args.learning_rate if args.learning_rate is not None else 0.001
+    weight_decay = args.weight_decay if args.weight_decay is not None else 5e-4
+    optimizer_name = args.optimizer or "adamw"
     strategies = args.strategies or [args.strategy]
+
     all_results = []
 
     for strategy in strategies:
         for fraction in args.data_fraction:
             fraction_name = f"{int(fraction * 100)}pct"
-            experiment_name = (
-                f"{args.model}_{strategy}_{fraction_name}"
-            )
+            experiment_name = f"{args.model}_{strategy}_{fraction_name}"
             output_dir = output_root / experiment_name
             output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -60,14 +63,12 @@ def run_finetuning(args, device):
             print(f"Checkpoint: {checkpoint_path}")
             print("=" * 70)
 
-            train_loader, test_loader, classes = (
-                get_finetuning_loaders(
-                    data_dir=str(data_dir),
-                    batch_size=batch_size,
-                    data_fraction=fraction,
-                    seed=args.seed,
-                    num_workers=args.num_workers,
-                )
+            train_loader, test_loader, classes = get_finetuning_loaders(
+                data_dir=str(data_dir),
+                batch_size=batch_size,
+                data_fraction=fraction,
+                seed=args.seed,
+                num_workers=args.num_workers,
             )
 
             model = load_pretrained(
@@ -86,31 +87,20 @@ def run_finetuning(args, device):
                 freeze_epochs=args.freeze_epochs,
                 learning_rate=learning_rate,
                 weight_decay=weight_decay,
-                opt_name=args.optimizer
+                opt_name=optimizer_name,
             )
 
-            plot_fig(
-                history["train_loss"],
-                "Epoch",
-                "Cross-Entropy Loss",
-                "Fine-Tuning Training Loss",
-                str(plot_dir / f"{args.model}_{strategy}_{fraction}_train_loss.png"),
-            )
+            plot_fig(history["train_loss"], "Epoch", "Cross-Entropy Loss",
+                     "Fine-Tuning Training Loss",
+                     str(plot_dir / f"{experiment_name}_train_loss.png"))
 
-            plot_fig(
-                history["train_accuracy"],
-                "Epoch",
-                "Training Accuracy (%)",
-                "Fine-Tuning Training Accuracy",
-                str(plot_dir / f"{args.model}_{strategy}_{fraction}_train_accuracy.png"),
-            )
+            plot_fig(history["train_accuracy"], "Epoch", "Training Accuracy (%)",
+                     "Fine-Tuning Training Accuracy",
+                     str(plot_dir / f"{experiment_name}_train_accuracy.png"))
 
             metrics = evaluate_model(
-                model=model,
-                test_loader=test_loader,
-                classes=classes,
-                device=device,
-                checkpoint_path=output_dir / "best_model.pth",
+                model=model, test_loader=test_loader, classes=classes, device=device,
+                checkpoint_path=output_dir / f"best_model.pth",
             )
 
             results = {
@@ -120,7 +110,7 @@ def run_finetuning(args, device):
                 "checkpoint": str(checkpoint_path),
                 "strategy": strategy,
                 "data_fraction": fraction,
-                "optimizer": args.optimizer or "adamw",
+                "optimizer": optimizer_name,
                 "num_epochs": num_epochs,
                 "batch_size": batch_size,
                 "learning_rate": learning_rate,
@@ -129,40 +119,33 @@ def run_finetuning(args, device):
                 "metrics": metrics,
             }
 
-            with open(output_dir / "results.json", "w") as f:
+            with open(output_dir / f"{experiment_name}_results.json", "w") as f:
                 json.dump(results, f, indent=2)
 
             all_results.append(results)
-
             print(f"Saved results to: {output_dir}")
 
     summary = [
         {
-            "model": r["model"],
-            "strategy": r["strategy"],
-            "data_fraction": r["data_fraction"],
-            "test_loss": r["metrics"]["test_loss"],
-            "test_accuracy": r["metrics"]["test_accuracy"],
+            "model": result["model"],
+            "strategy": result["strategy"],
+            "data_fraction": result["data_fraction"],
+            "test_loss": result["metrics"]["test_loss"],
+            "test_accuracy": result["metrics"]["test_accuracy"],
         }
-        for r in all_results
+        for result in all_results
     ]
 
-    output_root.mkdir(parents=True, exist_ok=True)
-    summary_path = output_root / "summary.json"
-    plot_fig(history['train_loss'], 'epoch', 'Training Loss', 'Train Loss during finetuning',
-             plot_dir / "")
+    summary_path = output_root / f"{experiment_name}_summary.json"
 
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
 
     print("\nExperiment summary:")
     for row in summary:
-        print(
-            f"{row['model']:>10s} | "
-            f"{row['strategy']:>16s} | "
-            f"{row['data_fraction']:.0%} data | "
-            f"Accuracy: {row['test_accuracy']:.2f}%"
-        )
+        print(f"{row['model']:>10s} | {row['strategy']:>16s} | "
+              f"{row['data_fraction']:.0%} data | "
+              f"Accuracy: {row['test_accuracy']:.2f}%")
 
     print(f"Summary saved to: {summary_path}")
     return all_results

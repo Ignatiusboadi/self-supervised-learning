@@ -1,6 +1,8 @@
 import argparse
 import torch
 
+from utils.distributed import setup_runtime, cleanup_runtime
+
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Self-supervised pretraining and downstream fine-tuning")
@@ -21,7 +23,7 @@ def build_parser():
     parser.add_argument("--weight-decay", type=float, default=None)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto",)
+    parser.add_argument("--device", choices=["auto", "cuda", "cpu", "mps"], default="auto",)
     parser.add_argument("--optimizer", choices=["sgd", "adam", "adamw", "lars", "sam"], default=None, )
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--eta", type=float, default=0.001)
@@ -45,6 +47,7 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
+    runtime = setup_runtime(args.device)
 
     if args.epochs is not None and args.epochs < 1:
         raise ValueError("--epochs must be at least 1")
@@ -61,25 +64,24 @@ def main():
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
 
-    device = torch.device(
-        "cuda" if args.device == "auto" and torch.cuda.is_available()
-        else "cpu" if args.device == "auto"
-        else args.device
-    )
+    try:
+        runtime.print(f"Mode: {args.mode}")
+        runtime.print(f"Backbone: {args.model}")
+        runtime.print(f"Device: {runtime.device}")
+        runtime.print(f"Distributed: {runtime.distributed}, World size: {runtime.world_size}")
 
-    print(f"Mode: {args.mode}")
-    print(f"Backbone: {args.model}")
-    print(f"Device: {device}")
+        if runtime.device.type == "cuda":
+            runtime.print(f"GPU: {torch.cuda.get_device_name(runtime.device)}")
 
-    if device.type == "cuda":
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        if args.mode == "pretrain":
+            from pretrain import run_pretraining
+            run_pretraining(args, runtime)
+        else:
+            from finetune import run_finetuning
+            run_finetuning(args, runtime)
 
-    if args.mode == "pretrain":
-        from pretrain import run_pretraining
-        run_pretraining(args, device)
-    else:
-        from finetune import run_finetuning
-        run_finetuning(args, device)
+    finally:
+        cleanup_runtime(runtime)
 
 
 if __name__ == "__main__":
