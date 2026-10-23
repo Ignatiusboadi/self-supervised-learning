@@ -5,6 +5,11 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
+
+# pretrain.py
+import os
+from pathlib import Path
+
 import torch
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
@@ -17,68 +22,178 @@ from training.train import train_one_epoch
 from methods.simclr import SimCLRModel
 
 
-def main():
-    root = "."
-    dataset_path = os.path.join(root, "data", "cifar10", "train")
-    checkpoint_dir = os.path.join(root, "outputs/checkpoints", "simclr")
-    plot_dir = os.path.join(root, "outputs/plots", "simclr")
-    os.makedirs(plot_dir, exist_ok=True)
-    os.makedirs(checkpoint_dir, exist_ok=True)
+def run_pretraining(args, device):
+    # Default paths can be overridden from the CLI.
+    data_path = args.data_path or f"./data/{args.data}/train"
+    output_root = Path(args.output_dir or "./outputs")
+    checkpoint_dir = output_root / "checkpoints" / args.ssl_type
+    plot_dir = output_root / "plots" / args.ssl_type
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    plot_dir.mkdir(parents=True, exist_ok=True)
 
-    num_epochs = 2
-    batch_size = 512
+    num_epochs = args.epochs if args.epochs is not None else 100
+    batch_size = args.batch_size if args.batch_size is not None else 512
+    weight_decay = (
+        args.weight_decay if args.weight_decay is not None else 1e-6
+    )
+    momentum = args.momentum
+    base_lr = (
+        args.learning_rate
+        if args.learning_rate is not None
+        else 0.3 * batch_size / 256
+    )
 
-    base_lr = 0.3
-    peak_lr = base_lr * batch_size / 256
+    torch.manual_seed(args.seed)
+    if device.type == "cuda":
+        torch.cuda.manual_seed_all(args.seed)
 
-    momentum = 0.9
-    weight_decay = 1e-6
-    eta = 0.001
-    warmup_epochs = int(num_epochs * .2)
+    base_dataset = ImageFolder(
+        root=data_path,
+        transform=None,
+    )
+    dataset = SimCLRDataset(
+        base_dataset,
+        simclr_train_transforms(),
+    )
 
-    base_dataset = ImageFolder(root=dataset_path, transform=None, )
-    dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        drop_last=True,
+        pin_memory=(device.type == "cuda"),
+    )
 
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True,
-        pin_memory=(device.type == "cuda"), )
-    model = SimCLRModel().to(device)
-    optimizer = LARS(model.parameters(), lr=peak_lr, momentum=momentum, weight_decay=weight_decay,
-        eta=eta, weight_decay_filter=True, lars_adaptation_filter=True, )
-    optimizer = SAM(model.parameters(), torch.optim.SGD, lr=0.01, momentum=0.9, rho=0.05)
+    # Your SimCLRModel must accept resnet_variant.
+    model = SimCLRModel(
+        resnet_variant=args.model
+    ).to(device)
+
+    # Build the selected optimizer.
+    if args.optimizer is None:
+        optimizer_name = "lars"
+    else:
+        optimizer_name = args.optimizer
+
+    if optimizer_name == "lars":
+        optimizer = LARS(
+            model.parameters(),
+            lr=base_lr,
+            momentum=momentum,
+            weight_decay=weight_decay,
+            eta=args.eta,
+            weight_decay_filter=True,
+            lars_adaptation_filter=True,
+        )
+    elif optimizer_name == "sam":
+        optimizer = SAM(
+            model.parameters(),
+            torch.optim.SGD,
+            lr=base_lr,
+            momentum=momentum,
+            weight_decay=weight_decay,
+            rho=args.sam_rho,
+        )
+    elif optimizer_name == "sgd":
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=base_lr,
+            momentum=momentum,
+            weight_decay=weight_decay,
+        )
+    elif optimizer_name == "adam":
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=base_lr,
+            weight_decay=weight_decay,
+        )
+    elif optimizer_name == "adamw":
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=base_lr,
+            weight_decay=weight_decay,
+        )
+    else:
+        raise ValueError(f"Unsupported optimizer: {optimizer_name}")
 
     steps_per_epoch = len(loader)
+    if steps_per_epoch == 0:
+        raise ValueError(
+            "The DataLoader has no batches. Reduce the batch size "
+            "or check the dataset and drop_last setting."
+        )
+
     total_steps = num_epochs * steps_per_epoch
-    warmup_steps = min(warmup_epochs * steps_per_epoch, total_steps - 1, )
+    warmup_steps = min(
+        int(num_epochs * args.warmup_epochs) * steps_per_epoch,
+        total_steps - 1,
+    )
 
     train_losses = []
     learning_rates = []
     global_step = 0
 
     for epoch in range(num_epochs):
-        epoch_loss, epoch_lrs, global_step = train_one_epoch(model=model, train_loader=loader, optimizer=optimizer,
-            device=device, global_step=global_step, total_steps=total_steps, warmup_steps=warmup_steps,
-            peak_lr=peak_lr, epoch=epoch, num_epochs=num_epochs, )
+        epoch_loss, epoch_lrs, global_step = train_one_epoch(
+            model=model,
+            train_loader=loader,
+            optimizer=optimizer,
+            device=device,
+            global_step=global_step,
+            total_steps=total_steps,
+            warmup_steps=warmup_steps,
+            peak_lr=base_lr,
+            epoch=epoch,
+            num_epochs=num_epochs,
+            temperature=args.temperature,
+        )
 
         train_losses.append(epoch_loss)
         learning_rates.extend(epoch_lrs)
 
-        print(f"Epoch [{epoch + 1}/{num_epochs}] Loss: {epoch_loss:.4f} LR: {epoch_lrs[-1]:.6f}")
+        print(
+            f"Epoch [{epoch + 1}/{num_epochs}] "
+            f"Loss: {epoch_loss:.4f} "
+            f"LR: {epoch_lrs[-1]:.6f}"
+        )
 
-    checkpoint_path = os.path.join(checkpoint_dir, f"simclr_{model.resnet_variant}_checkpoint.pth", )
-    loss_fig = os.path.join(plot_dir, "loss.png")
-    plot_fig(train_losses, "Training step", "Mean NT-Xent Loss", "SimCLR Training Loss", loss_fig)
-    lr_fig = os.path.join(plot_dir, "lr.png")
-    plot_fig(learning_rates, "Training step", "Learning rate", "LR: warm-up + cosine decay", lr_fig)
-    torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(),
-            "epochs": num_epochs, "global_step": global_step, "train_losses": train_losses, }, checkpoint_path, )
-    encoder_path = os.path.join(checkpoint_dir, f"simclr_{model.resnet_variant}_encoder.pth",)
+    checkpoint_path = (
+        checkpoint_dir / f"simclr_{args.model}_checkpoint.pth"
+    )
+    encoder_path = (
+        checkpoint_dir / f"simclr_{args.model}_encoder.pth"
+    )
+
+    plot_fig(
+        train_losses,
+        "Epoch",
+        "Mean NT-Xent Loss",
+        "SimCLR Training Loss",
+        str(plot_dir / f"{args.model}_loss.png"),
+    )
+    plot_fig(
+        learning_rates,
+        "Training step",
+        "Learning rate",
+        "LR: warm-up + cosine decay",
+        str(plot_dir / f"{args.model}_lr.png"),
+    )
+
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "epochs": num_epochs,
+            "global_step": global_step,
+            "train_losses": train_losses,
+            "model": args.model,
+            "optimizer": optimizer_name,
+        },
+        checkpoint_path,
+    )
     torch.save(model.encoder.state_dict(), encoder_path)
 
     print(f"Checkpoint saved to: {checkpoint_path}")
     print(f"Encoder saved to: {encoder_path}")
-
-
-if __name__ == "__main__":
-    main()

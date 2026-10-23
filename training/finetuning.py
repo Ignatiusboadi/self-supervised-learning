@@ -1,4 +1,3 @@
-
 import copy
 from pathlib import Path
 
@@ -7,6 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 from tqdm.auto import tqdm
+from utils.optimizer_factory import build_optimizer
 
 
 def load_pretrained(checkpoint_path, resnet_variant="resnet18", num_classes=10):
@@ -99,13 +99,14 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
 
 
 def fit_finetuning(model, train_loader, device, output_dir, strategy="full", num_epochs=30,
-    freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4, ):
+    freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4, opt_name='sgd'):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay, nesterov=True,)
+    optimizer = build_optimizer(opt_name, parameters=model.parameters, learning_rate=learning_rate,
+                                weight_decay=weight_decay)
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, )
 
