@@ -1,117 +1,148 @@
-from dotenv import load_dotenv
 import json
-from pathlib import Path
-import os
 import torch
 
+from pathlib import Path
 from data_pipeline.finetuning_data import get_finetuning_loaders
 from training.finetuning import load_pretrained, fit_finetuning
 from utils.evaluation import evaluate_model
 
-root = "."
-OUTPUT_ROOT = os.path.join(root, "outputs/finetuning_outputs")
 
-BATCH_SIZE = 128
-NUM_EPOCHS = 2 # 30
-LEARNING_RATE = 0.01
-WEIGHT_DECAY = 5e-4
-FREEZE_EPOCHS = 10
-SEED = 42
+def run_finetuning(args, device):
+    root = Path(".")
+    output_root = Path(args.output_dir or "./outputs")
+    output_root = output_root / "finetuning_outputs"
 
-STRATEGIES = ["full", "freeze_then_full", "linear_probe", "partial", ]
-DATA_FRACTIONS = [1.0, 0.5]
+    data_dir = Path(args.data_path or str(root / "data" / args.data))
 
+    checkpoint_path = args.checkpoint
+    if checkpoint_path is None:
+        checkpoint_path = str(
+            root / "outputs" / "checkpoints" / args.ssl_type
+            / f"simclr_{args.model}_encoder.pth"
+        )
 
-def run_experiment(strategy, data_fraction, device, model_variant="resnet18", data="cifar10",
-                   ssl_type="simclr"):
-    DATA_DIR = os.path.join(root, "data", data)
-    CHECKPOINT_PATH = os.path.join(root, "outputs/checkpoints", ssl_type, f"simclr_{model_variant}_encoder.pth")
-    fraction_name = f"{int(data_fraction * 100)}pct"
-    experiment_name = f"{strategy}_{fraction_name}"
-    output_dir = Path(OUTPUT_ROOT) / experiment_name
-    output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = Path(checkpoint_path)
 
-    print("\n" + "=" * 70)
-    print(f"Experiment: {experiment_name}")
-    print("=" * 70)
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(
+            f"Pretrained checkpoint not found: {checkpoint_path}"
+        )
 
-    train_loader, test_loader, classes = get_finetuning_loaders(
-        data_dir=DATA_DIR, batch_size=BATCH_SIZE, data_fraction=data_fraction,
-        seed=SEED, num_workers=0, )
-
-    model = load_pretrained(checkpoint_path=CHECKPOINT_PATH, resnet_variant="resnet18", num_classes=len(classes), )
-
-    model, history = fit_finetuning(
-        model=model,
-        train_loader=train_loader,
-        device=device,
-        output_dir=output_dir,
-        strategy=strategy,
-        num_epochs=NUM_EPOCHS,
-        freeze_epochs=FREEZE_EPOCHS,
-        learning_rate=LEARNING_RATE,
-        weight_decay=WEIGHT_DECAY,
+    num_epochs = args.epochs if args.epochs is not None else 30
+    batch_size = args.batch_size if args.batch_size is not None else 128
+    learning_rate = (
+        args.learning_rate
+        if args.learning_rate is not None
+        else 0.001
+    )
+    weight_decay = (
+        args.weight_decay
+        if args.weight_decay is not None
+        else 5e-4
     )
 
-    metrics = evaluate_model(model=model, test_loader=test_loader, classes=classes, device=device,
-        checkpoint_path=output_dir / "best_model.pth", )
-
-    results = {
-        "strategy": strategy,
-        "data_fraction": data_fraction,
-        "num_epochs": NUM_EPOCHS,
-        "batch_size": BATCH_SIZE,
-        "learning_rate": LEARNING_RATE,
-        "weight_decay": WEIGHT_DECAY,
-        "history": history,
-        "metrics": metrics,
-    }
-
-    with open(output_dir / "results.json", "w") as f:
-        json.dump(results, f, indent=2)
-
-    print(f"Saved experiment outputs to: {output_dir}")
-    return results
-
-
-def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-
-    if device.type == "cuda":
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
-
+    strategies = args.strategies or [args.strategy]
     all_results = []
 
-    for data_fraction in DATA_FRACTIONS:
-        for strategy in STRATEGIES[0:1]:
-            result = run_experiment(
-                strategy=strategy,
-                data_fraction=data_fraction,
-                device=device,
+    for strategy in strategies:
+        for fraction in args.data_fraction:
+            fraction_name = f"{int(fraction * 100)}pct"
+            experiment_name = (
+                f"{args.model}_{strategy}_{fraction_name}"
             )
-            all_results.append(result)
+            output_dir = output_root / experiment_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            print("\n" + "=" * 70)
+            print(f"Experiment: {experiment_name}")
+            print(f"Checkpoint: {checkpoint_path}")
+            print("=" * 70)
+
+            train_loader, test_loader, classes = (
+                get_finetuning_loaders(
+                    data_dir=str(data_dir),
+                    batch_size=batch_size,
+                    data_fraction=fraction,
+                    seed=args.seed,
+                    num_workers=args.num_workers,
+                )
+            )
+
+            model = load_pretrained(
+                checkpoint_path=str(checkpoint_path),
+                resnet_variant=args.model,
+                num_classes=len(classes),
+            )
+
+            model, history = fit_finetuning(
+                model=model,
+                train_loader=train_loader,
+                device=device,
+                output_dir=output_dir,
+                strategy=strategy,
+                num_epochs=num_epochs,
+                freeze_epochs=args.freeze_epochs,
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                opt_name=args.optimizer
+            )
+
+            metrics = evaluate_model(
+                model=model,
+                test_loader=test_loader,
+                classes=classes,
+                device=device,
+                checkpoint_path=output_dir / "best_model.pth",
+            )
+
+            results = {
+                "mode": "finetune",
+                "model": args.model,
+                "dataset": args.data,
+                "checkpoint": str(checkpoint_path),
+                "strategy": strategy,
+                "data_fraction": fraction,
+                "optimizer": args.optimizer or "adamw",
+                "num_epochs": num_epochs,
+                "batch_size": batch_size,
+                "learning_rate": learning_rate,
+                "weight_decay": weight_decay,
+                "history": history,
+                "metrics": metrics,
+            }
+
+            with open(output_dir / "results.json", "w") as f:
+                json.dump(results, f, indent=2)
+
+            all_results.append(results)
+
+            print(f"Saved results to: {output_dir}")
 
     summary = [
         {
-            "strategy": result["strategy"],
-            "data_fraction": result["data_fraction"],
-            "test_loss": result["metrics"]["test_loss"],
-            "test_accuracy": result["metrics"]["test_accuracy"],
+            "model": r["model"],
+            "strategy": r["strategy"],
+            "data_fraction": r["data_fraction"],
+            "test_loss": r["metrics"]["test_loss"],
+            "test_accuracy": r["metrics"]["test_accuracy"],
         }
-        for result in all_results]
+        for r in all_results
+    ]
 
-    summary_path = Path(OUTPUT_ROOT) / "summary.json"
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    output_root.mkdir(parents=True, exist_ok=True)
+    summary_path = output_root / "summary.json"
 
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
 
     print("\nExperiment summary:")
     for row in summary:
-        print(f"{row['strategy']:>18s} | {row['data_fraction']:.0%} data | test accuracy: {row['test_accuracy']:.2f}%")
-    print(f"\nSummary saved to: {summary_path}")
+        print(
+            f"{row['model']:>10s} | "
+            f"{row['strategy']:>16s} | "
+            f"{row['data_fraction']:.0%} data | "
+            f"Accuracy: {row['test_accuracy']:.2f}%"
+        )
 
-
-if __name__ == "__main__":
-    main()
+    print(f"Summary saved to: {summary_path}")
+    return all_results
