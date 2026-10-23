@@ -9,18 +9,27 @@ from torchvision import models
 from tqdm.auto import tqdm
 
 
-def load_pretrained(checkpoint_path, num_classes=10):
+def load_pretrained(checkpoint_path, resnet_variant="resnet18", num_classes=10):
     checkpoint_path = Path(checkpoint_path)
-
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Encoder checkpoint not found: {checkpoint_path}")
+    if resnet_variant == "resnet18":
+        model = models.resnet18(weights=None)
+    elif resnet_variant == "resnet50":
+        model = models.resnet50(weights=None)
+    else:
+        raise ValueError(
+            f"Unsupported backbone: {resnet_variant}. "
+            "Choose 'resnet18' or 'resnet50'."
+        )
 
-    model = models.resnet18(weights=None)
     model.fc = nn.Identity()
 
     state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True, )
-    model.load_state_dict(state_dict, strict=True)
-    model.fc = nn.Linear(512, num_classes)
+    model.load_state_dict(state_dict)
+    feature_dim = model.fc.in_features if isinstance(model.fc, nn.Linear) else (
+        512 if resnet_variant == "resnet18" else 2048)
+    model.fc = nn.Linear(feature_dim, num_classes)
     return model
 
 
