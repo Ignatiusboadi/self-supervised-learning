@@ -99,13 +99,13 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
 
 
 def fit_finetuning(model, train_loader, device, output_dir, strategy="full", num_epochs=30,
-    freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4, opt_name='SGD'):
+    freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4, opt_name='sgd'):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = build_optimizer("SGD", parameters=model.parameters, learning_rate=learning_rate,
+    optimizer = build_optimizer(opt_name, parameters=model.parameters, learning_rate=learning_rate,
                                 weight_decay=weight_decay)
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, )
