@@ -105,7 +105,7 @@ def fit_finetuning(model, train_loader, device, output_dir, strategy="full", num
 
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = build_optimizer(opt_name, parameters=model.parameters, learning_rate=learning_rate,
+    optimizer = build_optimizer(opt_name, parameters=model.parameters(), learning_rate=learning_rate,
                                 weight_decay=weight_decay)
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, )
