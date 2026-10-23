@@ -5,11 +5,13 @@ from pathlib import Path
 from data_pipeline.finetuning_data import get_finetuning_loaders
 from training.finetuning import load_pretrained, fit_finetuning
 from utils.evaluation import evaluate_model
+from utils.plotting import plot_fig
 
 
 def run_finetuning(args, device):
     root = Path(".")
     output_root = Path(args.output_dir or "./outputs")
+    plot_dir = output_root / "./plots"
     output_root = output_root / "finetuning_outputs"
 
     data_dir = Path(args.data_path or str(root / "data" / args.data))
@@ -87,6 +89,22 @@ def run_finetuning(args, device):
                 opt_name=args.optimizer
             )
 
+            plot_fig(
+                history["train_loss"],
+                "Epoch",
+                "Cross-Entropy Loss",
+                "Fine-Tuning Training Loss",
+                str(plot_dir / f"{args.model}_{strategy}_{fraction}_train_loss.png"),
+            )
+
+            plot_fig(
+                history["train_accuracy"],
+                "Epoch",
+                "Training Accuracy (%)",
+                "Fine-Tuning Training Accuracy",
+                str(plot_dir / f"{args.model}_{strategy}_{fraction}_train_accuracy.png"),
+            )
+
             metrics = evaluate_model(
                 model=model,
                 test_loader=test_loader,
@@ -131,6 +149,8 @@ def run_finetuning(args, device):
 
     output_root.mkdir(parents=True, exist_ok=True)
     summary_path = output_root / "summary.json"
+    plot_fig(history['train_loss'], 'epoch', 'Training Loss', 'Train Loss during finetuning',
+             plot_dir / "")
 
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
