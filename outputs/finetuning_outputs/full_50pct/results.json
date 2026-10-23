@@ -1,0 +1,40 @@
+{
+  "strategy": "full",
+  "data_fraction": 0.5,
+  "num_epochs": 2,
+  "batch_size": 128,
+  "learning_rate": 0.01,
+  "weight_decay": 0.0005,
+  "history": {
+    "train_loss": [
+      1.9048843537139892,
+      1.675440359840393
+    ],
+    "train_accuracy": [
+      30.936,
+      39.104
+    ],
+    "learning_rate": [
+      0.01,
+      0.005
+    ]
+  },
+  "metrics": {
+    "test_loss": 1.6455266122817993,
+    "test_accuracy": 39.52,
+    "correct": 3952,
+    "total": 10000,
+    "per_class_accuracy": {
+      "airplane": 34.8,
+      "automobile": 56.8,
+      "bird": 2.3,
+      "cat": 24.0,
+      "deer": 64.9,
+      "dog": 37.7,
+      "frog": 19.1,
+      "horse": 43.6,
+      "ship": 66.5,
+      "truck": 45.5
+    }
+  }
+}

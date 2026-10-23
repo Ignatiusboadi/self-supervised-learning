@@ -1,0 +1,14 @@
+[
+  {
+    "strategy": "full",
+    "data_fraction": 1.0,
+    "test_loss": 1.4348419931411742,
+    "test_accuracy": 47.39
+  },
+  {
+    "strategy": "full",
+    "data_fraction": 0.5,
+    "test_loss": 1.6455266122817993,
+    "test_accuracy": 39.52
+  }
+]
