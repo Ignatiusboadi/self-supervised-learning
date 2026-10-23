@@ -49,7 +49,6 @@ def setup_runtime(requested_device="auto"):
     elif requested_device == "cuda":
         if world_size > 1 and not torch.cuda.is_available():
             raise RuntimeError("Distributed CUDA requires CUDA")
-
         device = torch.device(f"cuda:{local_rank}" if world_size > 1 else "cuda")
 
     elif requested_device == "auto":
@@ -62,14 +61,11 @@ def setup_runtime(requested_device="auto"):
 
     else:
         raise ValueError("device must be one of: auto, cuda, mps, cpu")
-
-    # DDP is enabled only for multi-process CUDA training.
     distributed = world_size > 1
 
     if distributed:
         if device.type != "cuda":
-            raise RuntimeError("This implementation supports DDP only with CUDA. Use one process for MPS or CPU."
-            )
+            raise RuntimeError("This implementation supports DDP only with CUDA. Use one process for MPS or CPU.")
 
         torch.cuda.set_device(device)
         backend = "nccl"
