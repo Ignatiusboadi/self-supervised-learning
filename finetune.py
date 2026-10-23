@@ -11,12 +11,6 @@ from utils.plotting import plot_fig
 
 
 def run_finetuning(args, runtime: Runtime):
-    if runtime.distributed:
-        raise NotImplementedError(
-            "Distributed fine-tuning requires distributed samplers, "
-            "rank-safe checkpoint saving, and distributed-aware evaluation."
-        )
-
     device = runtime.device
     root = Path(args.root_dir)
     base_output_dir = Path(args.output_dir or root / "outputs")
