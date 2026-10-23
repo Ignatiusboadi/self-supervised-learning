@@ -5,7 +5,8 @@ class SimCLRModel(nn.Module):
     resnet_models = {"resnet18": models.resnet18, "resnet50": models.resnet50}
     def __init__(self, resnet_variant="resnet18", projection_dim=128):
         super().__init__()
-        base_model = SimCLRModel.resnet_models[resnet_variant](weights=None)
+        self.resnet_variant = resnet_variant
+        base_model = SimCLRModel.resnet_models[self.resnet_variant](weights=None)
         num_ftrs = base_model.fc.in_features
         base_model.fc = nn.Identity()
         self.encoder = base_model
