@@ -1,16 +1,12 @@
 import os
 
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
-
-
-# pretrain.py
-import os
-from pathlib import Path
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["OMP_NUM_THREADS"] = "1"
+# os.environ["MKL_NUM_THREADS"] = "1"
+# os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import torch
+from pathlib import Path
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 
@@ -23,9 +19,8 @@ from methods.simclr import SimCLRModel
 
 
 def run_pretraining(args, device):
-    # Default paths can be overridden from the CLI.
-    data_path = args.data_path or f"./data/{args.data}/train"
-    output_root = Path(args.output_dir or "./outputs")
+    data_path = args.data_path or f"{args.root_dir}/data/{args.data}/train"
+    output_root = Path(args.output_dir or f"{args.root_dir}/outputs")
     checkpoint_dir = output_root / "checkpoints" / args.ssl_type
     plot_dir = output_root / "plots" / args.ssl_type
 
@@ -34,9 +29,7 @@ def run_pretraining(args, device):
 
     num_epochs = args.epochs if args.epochs is not None else 100
     batch_size = args.batch_size if args.batch_size is not None else 512
-    weight_decay = (
-        args.weight_decay if args.weight_decay is not None else 1e-6
-    )
+    weight_decay = (args.weight_decay if args.weight_decay is not None else 1e-6)
     momentum = args.momentum
     base_lr = (
         args.learning_rate
@@ -66,12 +59,8 @@ def run_pretraining(args, device):
         pin_memory=(device.type == "cuda"),
     )
 
-    # Your SimCLRModel must accept resnet_variant.
-    model = SimCLRModel(
-        resnet_variant=args.model
-    ).to(device)
+    model = SimCLRModel(resnet_variant=args.model).to(device)
 
-    # Build the selected optimizer.
     if args.optimizer is None:
         optimizer_name = "lars"
     else:

@@ -9,9 +9,9 @@ from utils.plotting import plot_fig
 
 
 def run_finetuning(args, device):
-    root = Path(".")
-    output_root = Path(args.output_dir or "./outputs")
-    plot_dir = output_root / "./plots"
+    root = Path(args.root_dir)
+    output_root = Path(args.output_dir or f"{root}/outputs")
+    plot_dir = output_root / "plots"
     output_root = output_root / "finetuning_outputs"
 
     data_dir = Path(args.data_path or str(root / "data" / args.data))
