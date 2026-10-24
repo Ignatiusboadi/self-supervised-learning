@@ -1,10 +1,3 @@
-import os
-
-# os.environ["OPENBLAS_NUM_THREADS"] = "1"
-# os.environ["OMP_NUM_THREADS"] = "1"
-# os.environ["MKL_NUM_THREADS"] = "1"
-# os.environ["NUMEXPR_NUM_THREADS"] = "1"
-
 import torch
 from pathlib import Path
 from torch.utils.data import DataLoader, DistributedSampler
@@ -112,14 +105,14 @@ def run_pretraining(args, runtime: Runtime):
 
             print(f"Epoch [{epoch + 1}/{num_epochs}] Loss: {epoch_loss:.4f} LR: {epoch_lrs[-1]:.6f}")
 
-            checkpoint_path = (checkpoint_dir / f"simclr_{args.model}_checkpoint.pth")
-            encoder_path = (checkpoint_dir / f"simclr_{args.model}_encoder.pth")
+            checkpoint_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_checkpoint.pth")
+            encoder_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_encoder.pth")
             model_to_save = model.module if runtime.distributed else model
 
             plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", "SimCLR Training Loss",
-                     str(plot_dir / f"{args.model}_loss.png"), )
+                     str(plot_dir / f"{args.model}_{args.optimizer}_loss.png"), )
             plot_fig(learning_rates, "Training step", "Learning rate",
-                "LR: warm-up + cosine decay", str(plot_dir / f"{args.model}_lr.png"), )
+                "LR: warm-up + cosine decay", str(plot_dir / f"{args.model}_{args.optimizer}_lr.png"), )
 
             torch.save(
                 {
