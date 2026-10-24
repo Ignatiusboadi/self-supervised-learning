@@ -125,3 +125,24 @@ class SAM(torch.optim.Optimizer):
     def load_state_dict(self, state_dict):
         super().load_state_dict(state_dict)
         self.base_optimizer.param_groups = self.param_groups
+
+
+def disable_bn_running_stats(model):
+    """Call before the 2nd pass so BatchNorm running stats aren't updated twice."""
+
+    def _disable(m):
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+            m.backup_momentum = m.momentum
+            m.momentum = 0
+
+    model.apply(_disable)
+
+
+def enable_bn_running_stats(model):
+    """Call after the 2nd pass to restore normal BatchNorm momentum."""
+
+    def _enable(m):
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm) and hasattr(m, "backup_momentum"):
+            m.momentum = m.backup_momentum
+
+    model.apply(_enable)
