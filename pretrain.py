@@ -39,7 +39,11 @@ def run_pretraining(args, runtime: Runtime):
     # sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
     #                               shuffle=True, drop_last=True)
     #            if runtime.distributed else None)
-    data = load_uint8_images(base_dataset, cache_path="cifar10_train_u8.pt")
+    if args.cache_path is None:
+        cache_path = output_root / "cifar10_train_u8.pt"
+    else:
+        cache_path = args.cache_path
+    data = load_uint8_images(base_dataset, cache_path=cache_path)
     loader = GPUSimCLRLoader(data, batch_size=batch_size, device=device, blur=True)
     # loader = DataLoader(dataset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
     #                     num_workers=args.num_workers, drop_last=True, pin_memory=(runtime.device.type == "cuda"),

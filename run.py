@@ -16,6 +16,8 @@ def build_parser():
                         help="Dataset directory; defaults depend on the mode", )
     parser.add_argument("--output-dir", type=str, default=None,
         help="Root directory for checkpoints, plots, and results", )
+    parser.add_argument("--cache-path", type=str, default=None,
+                        help="path for uint cache", )
     parser.add_argument("--root-dir", type=str, default=".")
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
