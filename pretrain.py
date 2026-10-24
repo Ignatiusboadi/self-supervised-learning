@@ -1,10 +1,11 @@
 import torch
 from pathlib import Path
-from torch.utils.data import DataLoader, DistributedSampler
+# from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.datasets import ImageFolder
 
-from data_pipeline.augmentations import simclr_train_transforms
-from data_pipeline.datasets import SimCLRDataset
+# from data_pipeline.augmentations import simclr_train_transforms
+# from data_pipeline.datasets import SimCLRDataset
+from data_pipeline.gpu_simclr_data import load_uint8_images, GPUSimCLRLoader
 from utils.distributed import Runtime, setup_runtime, wrap_model
 from utils.optimizers import LARS, SAM
 from utils.plotting import plot_fig
@@ -34,14 +35,15 @@ def run_pretraining(args, runtime: Runtime):
         torch.cuda.manual_seed_all(args.seed)
 
     base_dataset = ImageFolder(root=data_path, transform=None, )
-    dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
-    sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
-                                  shuffle=True, drop_last=True)
-               if runtime.distributed else None)
-
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
-                        num_workers=args.num_workers, drop_last=True, pin_memory=(runtime.device.type == "cuda"),
-                        persistent_workers=(args.num_workers > 0))
+    # dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
+    # sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
+    #                               shuffle=True, drop_last=True)
+    #            if runtime.distributed else None)
+    data = load_uint8_images(base_dataset, cache_path="cifar10_train_u8.pt")
+    loader = GPUSimCLRLoader(data, batch_size=batch_size, device=device, blur=True)
+    # loader = DataLoader(dataset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
+    #                     num_workers=args.num_workers, drop_last=True, pin_memory=(runtime.device.type == "cuda"),
+    #                     persistent_workers=(args.num_workers > 0))
 
     model = SimCLRModel(resnet_variant=args.model) #  .to(device)
     model = wrap_model(model, runtime)
@@ -79,8 +81,8 @@ def run_pretraining(args, runtime: Runtime):
     global_step = 0
 
     for epoch in range(num_epochs):
-        if sampler is not None:
-            sampler.set_epoch(epoch)
+        if loader.sampler is not None:
+            loader.sampler.set_epoch(epoch)
         epoch_loss, epoch_lrs, global_step = train_one_epoch(
             model=model,
             train_loader=loader,
@@ -104,29 +106,28 @@ def run_pretraining(args, runtime: Runtime):
             learning_rates.append(epoch_lrs)
 
             print(f"Epoch [{epoch + 1}/{num_epochs}] Loss: {epoch_loss:.4f} LR: {epoch_lrs[-1]:.6f}")
+    if runtime.is_main:
+        checkpoint_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_checkpoint.pth")
+        encoder_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_encoder.pth")
+        model_to_save = model.module if runtime.distributed else model
 
-            checkpoint_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_checkpoint.pth")
-            encoder_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_encoder.pth")
-            model_to_save = model.module if runtime.distributed else model
+        plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", "SimCLR Training Loss",
+                 str(plot_dir / f"{args.model}_{args.optimizer}_loss.png"), )
+        plot_fig(learning_rates, "Training step", "Learning rate",
+            "LR: warm-up + cosine decay", str(plot_dir / f"{args.model}_{args.optimizer}_lr.png"), )
 
-            plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", "SimCLR Training Loss",
-                     str(plot_dir / f"{args.model}_{args.optimizer}_loss.png"), )
-            plot_fig(learning_rates, "Training step", "Learning rate",
-                "LR: warm-up + cosine decay", str(plot_dir / f"{args.model}_{args.optimizer}_lr.png"), )
+        torch.save(
+            {
+                "model_state_dict": model_to_save.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "epochs": num_epochs,
+                "global_step": global_step,
+                "train_losses": train_losses,
+                "model": args.model,
+                "optimizer": optimizer_name,
+            },
+            checkpoint_path, )
+        torch.save(model_to_save.encoder.state_dict(), encoder_path)
 
-            torch.save(
-                {
-                    "model_state_dict": model_to_save.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "epochs": num_epochs,
-                    "global_step": global_step,
-                    "train_losses": train_losses,
-                    "model": args.model,
-                    "optimizer": optimizer_name,
-                },
-                checkpoint_path,
-            )
-            torch.save(model_to_save.encoder.state_dict(), encoder_path)
-
-            print(f"Checkpoint saved to: {checkpoint_path}")
-            print(f"Encoder saved to: {encoder_path}")
+        print(f"Checkpoint saved to: {checkpoint_path}")
+        print(f"Encoder saved to: {encoder_path}")
