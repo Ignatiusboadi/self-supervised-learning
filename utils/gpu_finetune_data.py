@@ -137,13 +137,21 @@ class GPULabeledLoader:
 
 
 def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, data_fraction=1.0,
-                               seed=42, cache_dir=".", size=None):
-    data_dir, cache_dir = Path(data_dir), Path(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"_{size}" if size else ""
+                               seed=42, train_cache_path=".", test_cache_path:str=".", size=None):
+    train_cache_path, test_cache_path = Path(train_cache_path), Path(test_cache_path)
+    if data_dir is None:
+        missing = [p for p in (train_cache_path, test_cache_path) if not p.exists()]
+        if missing:
+            raise FileNotFoundError(f"Cache file(s) not found: {missing}. "
+                                    f"Pass data_dir so they can be built.")
+    else:
+        data_dir = Path(data_dir)
 
-    train = load_split(data_dir / "train", cache_dir / f"finetune_train_u8{tag}.pt", size)
-    test = load_split(data_dir / "test", cache_dir / f"finetune_test_u8{tag}.pt", size)
+    for p in (train_cache_path, test_cache_path):
+        p.parent.mkdir(parents=True, exist_ok=True)
+
+    train = load_split(data_dir / "train" if data_dir else None, train_cache_path, size)
+    test = load_split(data_dir / "test" if data_dir else None, test_cache_path, size)
 
     if train["classes"] != test["classes"]:
         raise ValueError("Training and test class mappings differ.")
