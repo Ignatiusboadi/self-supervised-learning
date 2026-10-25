@@ -1,10 +1,10 @@
 import torch
 from pathlib import Path
-# from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.datasets import ImageFolder
 
-# from data_pipeline.augmentations import simclr_train_transforms
-# from data_pipeline.datasets import SimCLRDataset
+from data_pipeline.augmentations import simclr_train_transforms
+from data_pipeline.datasets import SimCLRDataset
 from data_pipeline.gpu_simclr_data import load_uint8_images, GPUSimCLRLoader
 from utils.distributed import Runtime, setup_runtime, wrap_model
 from utils.optimizers import LARS, SAM
@@ -35,19 +35,19 @@ def run_pretraining(args, runtime: Runtime):
         torch.cuda.manual_seed_all(args.seed)
 
     base_dataset = ImageFolder(root=data_path, transform=None, )
-    # dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
-    # sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
-    #                               shuffle=True, drop_last=True)
-    #            if runtime.distributed else None)
-    if args.cache_path is None:
-        cache_path = output_root / "cifar10_train_u8.pt"
+    if args.train_cache_path is None:
+        dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
+        sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
+                                      shuffle=True, drop_last=True)
+                   if runtime.distributed else None)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
+                            num_workers=args.num_workers, drop_last=True, pin_memory=(runtime.device.type == "cuda"),
+                            persistent_workers=(args.num_workers > 0))
     else:
-        cache_path = args.cache_path
-    data = load_uint8_images(base_dataset, cache_path=cache_path)
-    loader = GPUSimCLRLoader(data, batch_size=batch_size, device=device, blur=True)
-    # loader = DataLoader(dataset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
-    #                     num_workers=args.num_workers, drop_last=True, pin_memory=(runtime.device.type == "cuda"),
-    #                     persistent_workers=(args.num_workers > 0))
+        cache_path = args.train_cache_path
+        data = load_uint8_images(base_dataset, cache_path=cache_path)
+        loader = GPUSimCLRLoader(data, batch_size=batch_size, device=device, blur=True)
+
 
     model = SimCLRModel(resnet_variant=args.model) #  .to(device)
     model = wrap_model(model, runtime)
@@ -85,8 +85,10 @@ def run_pretraining(args, runtime: Runtime):
     global_step = 0
 
     for epoch in range(num_epochs):
-        if loader.sampler is not None:
+        if args.train_cache_path is not None and loader.sampler is not None:
             loader.sampler.set_epoch(epoch)
+        elif sampler is not None:
+            sampler.set_epoch(epoch)
         epoch_loss, epoch_lrs, global_step = train_one_epoch(
             model=model,
             train_loader=loader,
