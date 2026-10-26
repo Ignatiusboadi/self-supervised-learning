@@ -93,12 +93,12 @@ def run_finetuning(args, runtime: Runtime):
                 opt_name=optimizer_name,
             )
 
-            plot_fig(history["train_loss"], "Epoch", "Cross-Entropy Loss",
-                     "Fine-Tuning Training Loss",
+            plot_fig(history["val_loss"], "Epoch", "Validation Loss",
+                     f"{experiment_name} Fine-Tuning validation Loss",
                      str(plot_dir / f"{experiment_name}_train_loss.png"))
 
-            plot_fig(history["train_"], "Epoch", "Training Accuracy (%)",
-                     "Fine-Tuning Training F1 Macro-average",
+            plot_fig(history["val_macro_f1"], "Epoch", "Validation F1 (macro-average) (%)",
+                     f"{experiment_name} Fine-Tuning Training F1 Macro-average",
                      str(plot_dir / f"{experiment_name}_train_f1_macro.png"))
 
             metrics = evaluate_model(
