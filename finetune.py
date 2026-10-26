@@ -87,6 +87,7 @@ def run_finetuning(args, runtime: Runtime):
                 strategy=strategy,
                 num_epochs=num_epochs,
                 freeze_epochs=args.freeze_epochs,
+                patience=args.patience,
                 learning_rate=learning_rate,
                 weight_decay=weight_decay,
                 opt_name=optimizer_name,
@@ -96,9 +97,9 @@ def run_finetuning(args, runtime: Runtime):
                      "Fine-Tuning Training Loss",
                      str(plot_dir / f"{experiment_name}_train_loss.png"))
 
-            plot_fig(history["train_accuracy"], "Epoch", "Training Accuracy (%)",
-                     "Fine-Tuning Training Accuracy",
-                     str(plot_dir / f"{experiment_name}_train_accuracy.png"))
+            plot_fig(history["train_"], "Epoch", "Training Accuracy (%)",
+                     "Fine-Tuning Training F1 Macro-average",
+                     str(plot_dir / f"{experiment_name}_train_f1_macro.png"))
 
             metrics = evaluate_model(
                 model=model, test_loader=test_loader, classes=classes, device=device,
@@ -128,11 +129,8 @@ def run_finetuning(args, runtime: Runtime):
             )
 
             if is_main_process:
-                with open(results_path, "w") as f:
+                with open(output_dir / f"{experiment_name}_results.json", "w") as f:
                     json.dump(results, f, indent=2)
-
-            with open(output_dir / f"{experiment_name}_results.json", "w") as f:
-                json.dump(results, f, indent=2)
 
             all_results.append(results)
             print(f"Saved results to: {output_dir}")

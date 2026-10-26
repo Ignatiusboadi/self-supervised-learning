@@ -34,6 +34,7 @@ def build_parser():
     parser.add_argument("--sam-rho", type=float, default=0.05)
     parser.add_argument("--temperature", type=float, default=0.5)
     parser.add_argument("--warmup-epochs", type=float, default=0.2)
+    parser.add_argument("--patience", type=int, default=10)
     parser.add_argument("--checkpoint", type=str, default=None,
         help="Path to the pretrained encoder or model checkpoint", )
     parser.add_argument("--strategy", choices=["full", "freeze_then_full", "linear_probe", "partial"],
