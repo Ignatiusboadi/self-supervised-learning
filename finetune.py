@@ -1,4 +1,5 @@
 import json
+import torch.distributed as dist
 from pathlib import Path
 
 from data_pipeline.finetuning_data import get_finetuning_loaders
@@ -119,6 +120,16 @@ def run_finetuning(args, runtime: Runtime):
                 "history": history,
                 "metrics": metrics,
             }
+
+            is_main_process = (
+                    not dist.is_available()
+                    or not dist.is_initialized()
+                    or dist.get_rank() == 0
+            )
+
+            if is_main_process:
+                with open(results_path, "w") as f:
+                    json.dump(results, f, indent=2)
 
             with open(output_dir / f"{experiment_name}_results.json", "w") as f:
                 json.dump(results, f, indent=2)
