@@ -5,7 +5,6 @@ from tqdm.auto import tqdm
 
 
 def metrics_from_confusion(cm):
-    """cm[true, pred] -> per-class precision/recall/F1 and aggregate scores."""
     cm = cm.double()
     tp = cm.diag()
     fp = cm.sum(0) - tp
@@ -14,7 +13,7 @@ def metrics_from_confusion(cm):
     precision = tp / (tp + fp).clamp(min=1)
     recall = tp / (tp + fn).clamp(min=1)
     f1 = 2 * tp / (2 * tp + fp + fn).clamp(min=1)
-    present = support > 0                         # classes that occur in the labels
+    present = support > 0
     return {
         "precision": precision, "recall": recall, "f1": f1, "support": support,
         "macro_f1": f1[present].mean().item(),
@@ -66,7 +65,6 @@ def evaluate_model(model, loader, classes, device, checkpoint_path=None,
                    "support": int(m["support"][i].item())}
             for i, name in enumerate(classes)},
     }
-    # kept for backwards compatibility: per-class accuracy == per-class recall
     metrics["per_class_accuracy"] = {n: v["recall"] for n, v in metrics["per_class"].items()}
 
     if verbose:
