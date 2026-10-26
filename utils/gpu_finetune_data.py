@@ -136,8 +136,24 @@ class GPULabeledLoader:
             yield self.transform(self.data[sel]), self.labels[sel]
 
 
+def get_stratified_split_indices(targets, val_fraction=0.1, seed=42):
+    rng = random.Random(seed)
+    targets = list(targets)
+    train_idx, val_idx = [], []
+    for c in sorted(set(targets)):
+        idx = [i for i, t in enumerate(targets) if t == c]
+        rng.shuffle(idx)
+        n_val = max(1, int(len(idx) * val_fraction)) if len(idx) > 1 else 0
+        val_idx += idx[:n_val]
+        train_idx += idx[n_val:]
+    rng.shuffle(train_idx)
+    rng.shuffle(val_idx)
+    return train_idx, val_idx
+
+
 def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, data_fraction=1.0,
-                               seed=42, train_cache_path=".", test_cache_path:str=".", size=None):
+                               val_fraction=0.1, seed=42, train_cache_path=".",
+                               test_cache_path:str=".", size=None):
     train_cache_path, test_cache_path = Path(train_cache_path), Path(test_cache_path)
     if data_dir is None:
         missing = [p for p in (train_cache_path, test_cache_path) if not p.exists()]
@@ -157,11 +173,20 @@ def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, data_fraction=1
         raise ValueError("Training and test class mappings differ.")
 
     data, labels = train["data"], train["labels"]
+    val_loader = None
+    if val_fraction > 0:
+        tr, va = get_stratified_split_indices(labels.tolist(), val_fraction, seed)
+        tr, va = torch.tensor(tr), torch.tensor(va)
+        val_data, val_labels = data[va], labels[va]
+        data, labels = data[tr], labels[tr]
     if data_fraction < 1.0:
         idx = torch.tensor(get_stratified_subset_indices(labels.tolist(), data_fraction, seed))
         data, labels = data[idx], labels[idx]
 
     train_loader = GPULabeledLoader(data, labels, batch_size, device, train=True, seed=seed)
+    if val_fraction > 0:
+        val_loader = GPULabeledLoader(val_data, val_labels, batch_size, device, train=False, shard=False)
+
     test_loader = GPULabeledLoader(test["data"], test["labels"], batch_size, device,
                                    train=False, shard=False)
-    return train_loader, test_loader, train["classes"]
+    return train_loader, val_loader, test_loader, train["classes"]

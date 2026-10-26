@@ -22,7 +22,7 @@ def metrics_from_confusion(cm):
     }
 
 
-def evaluate_model(model, loader, classes, device, checkpoint_path=None,
+def evaluate_model(model, test_loader, classes, device, checkpoint_path=None,
                    prefix="test", verbose=True):
     if checkpoint_path is not None:
         state_dict = torch.load(Path(checkpoint_path), map_location=device, weights_only=True)
@@ -36,7 +36,7 @@ def evaluate_model(model, loader, classes, device, checkpoint_path=None,
     cm = torch.zeros(C * C, dtype=torch.long, device=device)
 
     with torch.inference_mode():
-        for images, labels in tqdm(loader, desc=f"Evaluating ({prefix})", leave=False, disable=not verbose):
+        for images, labels in tqdm(test_loader, desc=f"Evaluating ({prefix})", leave=False, disable=not verbose):
             images = images.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
