@@ -1,13 +1,12 @@
 import json
 from pathlib import Path
 
-import torch
-
 from data_pipeline.finetuning_data import get_finetuning_loaders
 from training.finetuning import load_pretrained, fit_finetuning
 from utils.distributed import Runtime
 from utils.evaluation import evaluate_model
 from utils.plotting import plot_fig
+from utils.gpu_finetune_data import get_finetuning_loaders_gpu
 
 
 def run_finetuning(args, runtime: Runtime):
@@ -57,13 +56,20 @@ def run_finetuning(args, runtime: Runtime):
             print(f"Checkpoint: {checkpoint_path}")
             print("=" * 70)
 
-            train_loader, test_loader, classes = get_finetuning_loaders(
-                data_dir=str(data_dir),
-                batch_size=batch_size,
-                data_fraction=fraction,
-                seed=args.seed,
-                num_workers=args.num_workers,
-            )
+            if args.train_cache_path is None or args.test_cache_path is None:
+
+                train_loader, test_loader, classes = get_finetuning_loaders(
+                    data_dir=str(data_dir),
+                    batch_size=batch_size,
+                    data_fraction=fraction,
+                    seed=args.seed,
+                    num_workers=args.num_workers,
+                )
+            else:
+                train_loader, test_loader, classes = get_finetuning_loaders_gpu(
+                    data_dir, device=device, batch_size=batch_size, data_fraction=fraction,
+                    seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
+                )
 
             model = load_pretrained(
                 checkpoint_path=str(checkpoint_path),
