@@ -57,7 +57,7 @@ def evaluate_model(model, test_loader, classes, device, checkpoint_path=None,
         "balanced_accuracy": 100.0 * m["balanced_accuracy"],
         "correct": correct,
         "total": total,
-        "confusion_matrix": cm,
+        "confusion_matrix": cm.tolist(),
         "per_class": {
             name: {"precision": 100.0 * m["precision"][i].item(),
                    "recall": 100.0 * m["recall"][i].item(),
