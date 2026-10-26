@@ -149,8 +149,8 @@ def fit_finetuning(
     learning_rate=0.01,
     weight_decay=5e-4,
     opt_name="sgd",
-    patience=7,
-    min_delta=1e-4,
+    patience=10,
+    min_delta=1e-3,
 ):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -187,7 +187,8 @@ def fit_finetuning(
         "learning_rate": [],
     }
 
-    best_val_loss = float("inf")
+    # best_val_loss = float("inf")
+    best_val_macro_f1 = -float("inf")
     best_state = None
     best_epoch = -1
     epochs_without_improvement = 0
@@ -248,10 +249,10 @@ def fit_finetuning(
                 f"LR: {current_lr:.6f}"
             )
 
-            improved = val_loss < best_val_loss - min_delta
+            improved = val_macro_f1 > best_val_macro_f1 + min_delta
 
             if improved:
-                best_val_loss = val_loss
+                best_val_macro_f1 = val_macro_f1
                 best_epoch = epoch + 1
                 epochs_without_improvement = 0
 
@@ -263,10 +264,7 @@ def fit_finetuning(
             else:
                 epochs_without_improvement += 1
 
-            should_stop = (
-                patience is not None
-                and epochs_without_improvement >= patience
-            )
+            should_stop = (patience is not None and epochs_without_improvement >= patience)
 
         else:
             should_stop = False
@@ -287,7 +285,7 @@ def fit_finetuning(
                 print(
                     f"Early stopping at epoch {epoch + 1}. "
                     f"Best epoch: {best_epoch}, "
-                    f"best validation loss: {best_val_loss:.4f}"
+                    f"best validation loss: {best_val_macro_f1:.4f}"
                 )
             break
 
