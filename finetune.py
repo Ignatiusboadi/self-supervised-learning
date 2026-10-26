@@ -57,16 +57,16 @@ def run_finetuning(args, runtime: Runtime):
             print("=" * 70)
 
             if args.train_cache_path is None or args.test_cache_path is None:
-
-                train_loader, test_loader, classes = get_finetuning_loaders(
+                train_loader, val_loader, test_loader, classes = get_finetuning_loaders(
                     data_dir=str(data_dir),
                     batch_size=batch_size,
                     data_fraction=fraction,
+                    val_fraction=0.1,
                     seed=args.seed,
                     num_workers=args.num_workers,
                 )
             else:
-                train_loader, test_loader, classes = get_finetuning_loaders_gpu(
+                train_loader, val_loader, test_loader, classes = get_finetuning_loaders_gpu(
                     data_dir, device=device, batch_size=batch_size, data_fraction=fraction,
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
                 )
@@ -80,6 +80,7 @@ def run_finetuning(args, runtime: Runtime):
             model, history = fit_finetuning(
                 model=model,
                 train_loader=train_loader,
+                val_loader=val_loader,
                 device=device,
                 output_dir=output_dir,
                 strategy=strategy,
