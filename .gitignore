@@ -1,10 +1,12 @@
 data/*
+outputs/*
 *.pth
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
-
+utils/*.pt
+outputs/Experiment*.txt
 # C extensions
 *.so
 
