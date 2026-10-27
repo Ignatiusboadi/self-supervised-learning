@@ -8,21 +8,41 @@ from torchvision import datasets, transforms
 
 CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD = (0.2470, 0.2435, 0.2616)
+CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
+CIFAR100_STD  = (0.2675, 0.2565, 0.2761)
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
-def get_finetuning_transforms():
-    train_transform = transforms.Compose([
+def get_finetuning_transforms(img_size=None, dataset="cifar10"):
+    if dataset == "cifar10":
+        mean, std = CIFAR10_MEAN, CIFAR10_STD
+    elif dataset == "cifar100":
+        mean, std = CIFAR100_MEAN, CIFAR100_STD
+    elif dataset in ("imagenet", "aptos"):
+        mean, std = IMAGENET_MEAN, IMAGENET_STD
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset}")
+
+    train_ops = []
+    test_ops = []
+
+    if img_size is not None:
+        train_ops.append(transforms.Resize((img_size, img_size)))
+        test_ops.append(transforms.Resize((img_size, img_size)))
+
+    train_ops.extend([
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(CIFAR10_MEAN, CIFAR10_STD),
+        transforms.Normalize(mean, std),
     ])
 
-    test_transform = transforms.Compose([
+    test_ops.extend([
         transforms.ToTensor(),
-        transforms.Normalize(CIFAR10_MEAN, CIFAR10_STD),
+        transforms.Normalize(mean, std),
     ])
 
-    return train_transform, test_transform
+    return transforms.Compose(train_ops), transforms.Compose(test_ops)
 
 
 def get_stratified_subset_indices(targets, fraction=0.5, seed=42):
@@ -85,6 +105,8 @@ def get_stratified_split_indices(targets, val_fraction=0.1, seed=42):
 
 def get_finetuning_loaders(
     data_dir,
+    dataset_name="cifar10",
+    img_size=None,
     batch_size=128,
     data_fraction=1.0,
     val_fraction=0.1,
@@ -92,7 +114,7 @@ def get_finetuning_loaders(
     num_workers=0,
 ):
     data_dir = Path(data_dir)
-    train_transform, test_transform = get_finetuning_transforms()
+    train_transform, test_transform = get_finetuning_transforms(dataset_name, img_size)
 
     train_dataset = datasets.ImageFolder(
         root=str(data_dir / "train"),

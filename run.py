@@ -11,9 +11,11 @@ def build_parser():
         help="Training workflow to execute", )
     parser.add_argument("--model", choices=["resnet18", "resnet50"], default="resnet18",
         help="Backbone architecture", )
-    parser.add_argument("--data", default="cifar10", help="Dataset name", )
+    parser.add_argument("--dataset", default="cifar10", help="Dataset name", )
     parser.add_argument("--data-path", type=str, default=None,
                         help="Dataset directory; defaults depend on the mode", )
+    parser.add_argument("--image-size", type=int, default=None,
+                        help="Image size, use dataset default if omitted")
     parser.add_argument("--output-dir", type=str, default=None,
         help="Root directory for checkpoints, plots, and results", )
     parser.add_argument("--train-cache-path", type=str, default=None,

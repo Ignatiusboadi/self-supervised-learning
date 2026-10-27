@@ -14,6 +14,10 @@ from tqdm.auto import tqdm
 
 CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD = (0.2470, 0.2435, 0.2616)
+CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
+CIFAR100_STD  = (0.2675, 0.2565, 0.2761)
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
 def _read(path, size):
@@ -151,7 +155,7 @@ def get_stratified_split_indices(targets, val_fraction=0.1, seed=42):
     return train_idx, val_idx
 
 
-def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, data_fraction=1.0,
+def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, img_size=None, data_fraction=1.0,
                                val_fraction=0.1, seed=42, train_cache_path=".",
                                test_cache_path:str=".", size=None):
     train_cache_path, test_cache_path = Path(train_cache_path), Path(test_cache_path)

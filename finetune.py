@@ -7,7 +7,7 @@ from training.finetuning import load_pretrained, fit_finetuning
 from utils.distributed import Runtime
 from utils.evaluation import evaluate_model
 from utils.plotting import plot_fig
-from utils.gpu_finetune_data import get_finetuning_loaders_gpu
+from data_pipeline.gpu_finetune_data import get_finetuning_loaders_gpu
 
 
 def run_finetuning(args, runtime: Runtime):
@@ -20,7 +20,7 @@ def run_finetuning(args, runtime: Runtime):
     plot_dir.mkdir(parents=True, exist_ok=True)
     output_root.mkdir(parents=True, exist_ok=True)
 
-    data_dir = Path(args.data_path or root / "data" / args.data)
+    data_dir = Path(args.data_path or root / "data" / args.dataset)
 
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
@@ -60,6 +60,7 @@ def run_finetuning(args, runtime: Runtime):
             if args.train_cache_path is None or args.test_cache_path is None:
                 train_loader, val_loader, test_loader, classes = get_finetuning_loaders(
                     data_dir=str(data_dir),
+                    img_size=args.image_size,
                     batch_size=batch_size,
                     data_fraction=fraction,
                     val_fraction=0.1,
@@ -68,7 +69,7 @@ def run_finetuning(args, runtime: Runtime):
                 )
             else:
                 train_loader, val_loader, test_loader, classes = get_finetuning_loaders_gpu(
-                    data_dir, device=device, batch_size=batch_size, data_fraction=fraction,
+                    data_dir, device=device, batch_size=batch_size, data_fraction=fraction, img_size=args.image_size,
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
                 )
 
@@ -109,7 +110,7 @@ def run_finetuning(args, runtime: Runtime):
             results = {
                 "mode": "finetune",
                 "model": args.model,
-                "dataset": args.data,
+                "dataset": args.dataset,
                 "checkpoint": str(checkpoint_path),
                 "strategy": strategy,
                 "data_fraction": fraction,
