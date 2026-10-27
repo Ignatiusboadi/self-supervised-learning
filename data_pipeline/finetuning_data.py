@@ -114,7 +114,7 @@ def get_finetuning_loaders(
     num_workers=0,
 ):
     data_dir = Path(data_dir)
-    train_transform, test_transform = get_finetuning_transforms(dataset_name, img_size)
+    train_transform, test_transform = get_finetuning_transforms(dataset=dataset_name, img_size=img_size)
 
     train_dataset = datasets.ImageFolder(
         root=str(data_dir / "train"),
