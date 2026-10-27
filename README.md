@@ -165,4 +165,8 @@ The project focuses on SimCLR pretraining, downstream transfer learning, optimiz
 
 ## Reference
 
-Chen, T., Kornblith, S., Norouzi, M., and Hinton, G. (2020). [A Simple Framework for Contrastive Learning of Visual Representations](https://arxiv.org/abs/2002.05709). *ICML 2020*.
+- Chen, T., Kornblith, S., Norouzi, M., and Hinton, G. (2020). [A Simple Framework for Contrastive Learning of Visual Representations](https://arxiv.org/abs/2002.05709). *ICML 2020*.
+
+- Foret, P., Kleiner, A., Mobahi, H., & Neyshabur, B. (2020). [Sharpness-aware minimization for efficiently improving generalization](https://arxiv.org/abs/2010.01412). *arXiv preprint arXiv:2010.01412*.
+
+- You, Y., Gitman, I., & Ginsburg, B. (2017). [Large batch training of convolutional networks](https://arxiv.org/abs/1708.03888). *arXiv preprint arXiv:1708.03888*.
