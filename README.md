@@ -139,7 +139,7 @@ torchrun --standalone --nproc_per_node=2 run.py \
 
 - `--nproc_per_node=4`: launches four processes, typically one per GPU.
 - `--standalone`: configures distributed rendezvous for a single machine.
-- `--batch-size`: check the implementation to determine whether this is the per-process batch size or the global batch size. In standard DDP data loading, it is usually the per-process batch size, making the effective batch size approximately `batch size × number of GPUs`.
+- `--batch-size`: In DDP data loading, it is usually the per-process batch size, making the effective batch size approximately `batch size × number of GPUs`.
 
 Change the number of processes to match the GPUs available, for example, `--nproc_per_node=2` for two GPUs.
 
@@ -161,7 +161,7 @@ Validation data is used for model selection, while the held-out test set is rese
 
 The project focuses on SimCLR pretraining, downstream transfer learning, optimization comparisons, and experiments involving data availability and data quality.
 
-**Future work** includes a closer SimCLR v2 reproduction and more systematic comparisons of model capacity, batch size, and representation quality.
+**Future work** includes SimCLR v2 and MoCo reproduction and more systematic comparisons of model capacity, batch size, and representation quality.
 
 ## Reference
 
