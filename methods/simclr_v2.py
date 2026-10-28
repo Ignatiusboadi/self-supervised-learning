@@ -287,3 +287,41 @@ class SimCLRResNetEncoder(nn.Module):
 
         return torch.flatten(self.avgpool(x), 1)
 
+
+class ProjectionHead(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        projection_dim: int = 128,
+        hidden_dim: Optional[int] = None,
+    ):
+        super().__init__()
+
+        if hidden_dim is None:
+            hidden_dim = input_dim
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim, bias=False)
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
+
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.bn2 = nn.BatchNorm1d(hidden_dim)
+
+        self.fc3 = nn.Linear(hidden_dim, projection_dim)
+
+        self.output_dim = projection_dim
+        self.hidden_dim = hidden_dim
+
+    def forward(self, h, return_intermediates=False):
+        p1 = F.relu(self.bn1(self.fc1(h)), inplace=False)
+        p2 = F.relu(self.bn2(self.fc2(p1)), inplace=False)
+        z = self.fc3(p2)
+
+        if return_intermediates:
+            return {
+                "projection_1": p1,
+                "projection_2": p2,
+                "z": z,
+            }
+
+        return z
+
