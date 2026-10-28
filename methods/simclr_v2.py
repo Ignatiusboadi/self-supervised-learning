@@ -325,3 +325,76 @@ class ProjectionHead(nn.Module):
 
         return z
 
+
+class SimCLRModelV2(nn.Module):
+    def __init__(
+        self,
+        resnet_variant: str = "resnet18",
+        width_multiplier: int = 1,
+        use_sk: bool = False,
+        projection_dim: int = 128,
+        hidden_dim: Optional[int] = None,
+        small_image_stem: bool = False,
+        ft_proj_selector: int = 0,
+    ):
+        super().__init__()
+
+        self.encoder = SimCLRResNetEncoder(
+            resnet_variant=resnet_variant,
+            width_multiplier=width_multiplier,
+            use_sk=use_sk,
+            small_image_stem=small_image_stem,
+        )
+
+        self.projection_head = ProjectionHead(
+            input_dim=self.encoder.feature_dim,
+            projection_dim=projection_dim,
+            hidden_dim=hidden_dim,
+        )
+
+        self.ft_proj_selector = ft_proj_selector
+
+        if ft_proj_selector not in (0, 1, 2):
+            raise ValueError(
+                "ft_proj_selector must be 0, 1, or 2."
+            )
+
+        self.feature_dim = self.encoder.feature_dim
+        self.projection_dim = projection_dim
+
+    def encode(self, x):
+        return self.encoder(x)
+
+    def project(self, h, return_intermediates=False):
+        return self.projection_head(
+            h, return_intermediates=return_intermediates
+        )
+
+    def get_finetune_features(self, x):
+        h = self.encode(x)
+
+        if self.ft_proj_selector == 0:
+            return h
+
+        features = self.project(h, return_intermediates=True)
+
+        if self.ft_proj_selector == 1:
+            return features["projection_1"]
+
+        return features["projection_2"]
+
+    def forward(self, x, return_features=False):
+        h = self.encode(x)
+        projections = self.project(
+            h, return_intermediates=return_features
+        )
+
+        if not return_features:
+            return projections
+
+        return {
+            "h": h,
+            "projection_1": projections["projection_1"],
+            "projection_2": projections["projection_2"],
+            "z": projections["z"],
+        }
