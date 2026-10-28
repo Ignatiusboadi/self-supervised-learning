@@ -152,3 +152,138 @@ class Bottleneck(nn.Module):
         return self.relu(out)
 
 
+
+class SimCLRResNetEncoder(nn.Module):
+    RESNETS = {
+        'resnet18': 18,
+        'resnet34': 34,
+        'resnet50': 50,
+        'resnet101': 101,
+        'resnet152': 152
+    }
+    DEPTHS = {
+        18: (2, 2, 2, 2),
+        34: (3, 4, 6, 3),
+        50: (3, 4, 6, 3),
+        101: (3, 4, 23, 3),
+        152: (3, 8, 36, 3),
+    }
+
+    def __init__(
+        self,
+        resnet_variant: str = "resnet18",
+        width_multiplier: int = 1,
+        use_sk: bool = False,
+        in_channels: int = 3,
+        small_image_stem: bool = False,
+    ):
+        super().__init__()
+
+        if resnet_variant not in self.RESNETS:
+            raise ValueError(
+                f"Unsupported model {resnet_variant}. "
+                f"Choose from {list(self.RESNETS)}."
+            )
+
+        if width_multiplier not in (1, 2, 3):
+            raise ValueError(
+                "width_multiplier must be 1, 2, or 3."
+            )
+
+        self.depth = self.RESNETS[resnet_variant]
+        self.width_multiplier = width_multiplier
+        self.use_sk = use_sk
+
+        stem_channels = 64 * width_multiplier
+
+        if small_image_stem:
+            self.stem = nn.Sequential(
+                nn.Conv2d(
+                    in_channels, stem_channels,
+                    kernel_size=3, stride=1,
+                    padding=1, bias=False,
+                ),
+                nn.BatchNorm2d(stem_channels),
+                nn.ReLU(inplace=True),
+            )
+            self.maxpool = nn.Identity()
+        else:
+            self.stem = nn.Sequential(
+                nn.Conv2d(
+                    in_channels, stem_channels,
+                    kernel_size=7, stride=2,
+                    padding=3, bias=False,
+                ),
+                nn.BatchNorm2d(stem_channels),
+                nn.ReLU(inplace=True),
+            )
+            self.maxpool = nn.MaxPool2d(
+                kernel_size=3, stride=2, padding=1
+            )
+
+        self.in_channels = stem_channels
+
+        self.layer1 = self._make_layer(
+            64 * width_multiplier, self.DEPTHS[self.depth][0], 1
+        )
+        self.layer2 = self._make_layer(
+            128 * width_multiplier, self.DEPTHS[self.depth][1], 2
+        )
+        self.layer3 = self._make_layer(
+            256 * width_multiplier, self.DEPTHS[self.depth][2], 2
+        )
+        self.layer4 = self._make_layer(
+            512 * width_multiplier, self.DEPTHS[self.depth][3], 2
+        )
+
+        self.feature_dim = 2048 * width_multiplier
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+
+        self._initialize_weights()
+
+    def _make_layer(self, planes, blocks, stride):
+        layers = [
+            Bottleneck(
+                self.in_channels,
+                planes,
+                stride=stride,
+                use_sk=self.use_sk,
+            )
+        ]
+
+        self.in_channels = planes * Bottleneck.expansion
+
+        for _ in range(1, blocks):
+            layers.append(
+                Bottleneck(
+                    self.in_channels,
+                    planes,
+                    use_sk=self.use_sk,
+                )
+            )
+
+        return nn.Sequential(*layers)
+
+    def _initialize_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(
+                    module.weight,
+                    mode="fan_out",
+                    nonlinearity="relu",
+                )
+            elif isinstance(module, nn.BatchNorm2d):
+                nn.init.ones_(module.weight)
+                nn.init.zeros_(module.bias)
+
+    def forward(self, x):
+        x = self.stem(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        return torch.flatten(self.avgpool(x), 1)
+
