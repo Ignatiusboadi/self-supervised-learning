@@ -1,24 +1,78 @@
+from typing import Optional
+
+import torch
 import torch.nn as nn
-import torchvision.models as models
+import torch.nn.functional as F
 
 
-class SimCLRModelv2(nn.Module):
-    resnets = {"resnet18": models.resnet18, "resnet34": models.resnet34, "resnet50": models.resnet50,
-               "resnet101": models.resnet101, "resnet152": models.resnet152}
-    def __init__(self, model_name, projection_dim=128):
+
+class SelectiveKernelConv(nn.Module):
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        stride: int = 1,
+        reduction: int = 16,
+        min_dim: int = 32,
+    ):
         super().__init__()
-        base_model = SimCLRModelv2.resnets[model_name](weights=None)
-        num_ftrs = base_model.fc.in_features
-        base_model.fc = nn.Identity()
-        self.encoder = base_model
-        self.fc1 = nn.Linear(num_ftrs, projection_dim)
-        self.projection_head = nn.Sequential(
-            nn.Linear(num_ftrs, 512),
-            nn.ReLU(),
-            nn.Linear(512, projection_dim)
+
+        self.branch3 = nn.Sequential(
+            nn.Conv2d(
+                in_channels, out_channels,
+                kernel_size=3, stride=stride,
+                padding=1, bias=False,
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
         )
 
+        self.branch5 = nn.Sequential(
+            nn.Conv2d(
+                in_channels, out_channels,
+                kernel_size=3, stride=stride,
+                padding=2, dilation=2, bias=False,
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+        attention_dim = max(out_channels // reduction, min_dim)
+
+        self.attention_reduce = nn.Sequential(
+            nn.Conv2d(
+                out_channels, attention_dim,
+                kernel_size=1, bias=False,
+            ),
+            nn.BatchNorm2d(attention_dim),
+            nn.ReLU(inplace=True),
+        )
+
+        self.attention_expand = nn.Conv2d(
+            attention_dim,
+            2 * out_channels,
+            kernel_size=1,
+        )
+
+        self.out_channels = out_channels
+
     def forward(self, x):
-        h = self.encoder(x)
-        z = self.projection_head(h)
-        return z
+        a = self.branch3(x)
+        b = self.branch5(x)
+
+        combined = a + b
+        descriptor = F.adaptive_avg_pool2d(combined, 1)
+        descriptor = self.attention_reduce(descriptor)
+
+        batch_size = x.shape[0]
+        attention = self.attention_expand(descriptor)
+
+        attention = attention.reshape(
+            batch_size, 2, self.out_channels, 1, 1
+        )
+        attention = torch.softmax(attention, dim=1)
+
+        return attention[:, 0] * a + attention[:, 1] * b
+
+
