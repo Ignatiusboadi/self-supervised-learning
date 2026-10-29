@@ -28,14 +28,14 @@ def build_optimizer(
             weight_decay=weight_decay,
         )
 
-    if name == "adamw":
+    elif name == "adamw":
         return torch.optim.AdamW(
             parameters,
             lr=learning_rate,
             weight_decay=weight_decay,
         )
 
-    if name == "lars":
+    elif name == "lars":
         return LARS(
             parameters,
             lr=learning_rate,
@@ -46,7 +46,7 @@ def build_optimizer(
             lars_adaptation_filter=True,
         )
 
-    if name == "sam":
+    elif name == "sam":
         return SAM(
             parameters,
             torch.optim.SGD,

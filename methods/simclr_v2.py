@@ -25,7 +25,7 @@ class SelectiveKernelConv(nn.Module):
                 padding=1, bias=False,
             ),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
         )
 
         self.branch5 = nn.Sequential(
@@ -35,7 +35,7 @@ class SelectiveKernelConv(nn.Module):
                 padding=2, dilation=2, bias=False,
             ),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
         )
 
         attention_dim = max(out_channels // reduction, min_dim)
@@ -46,7 +46,7 @@ class SelectiveKernelConv(nn.Module):
                 kernel_size=1, bias=False,
             ),
             nn.BatchNorm2d(attention_dim),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
         )
 
         self.attention_expand = nn.Conv2d(
@@ -109,7 +109,7 @@ class Bottleneck(nn.Module):
                     padding=1, groups=groups, bias=False,
                 ),
                 nn.BatchNorm2d(width),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
             )
 
         self.bn2 = (
@@ -122,7 +122,7 @@ class Bottleneck(nn.Module):
         )
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
 
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
         out_channels = planes * self.expansion
 
@@ -204,7 +204,7 @@ class SimCLRResNetEncoder(nn.Module):
                     padding=1, bias=False,
                 ),
                 nn.BatchNorm2d(stem_channels),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
             )
             self.maxpool = nn.Identity()
         else:
@@ -215,7 +215,7 @@ class SimCLRResNetEncoder(nn.Module):
                     padding=3, bias=False,
                 ),
                 nn.BatchNorm2d(stem_channels),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
             )
             self.maxpool = nn.MaxPool2d(
                 kernel_size=3, stride=2, padding=1
@@ -370,18 +370,27 @@ class SimCLRModelV2(nn.Module):
             h, return_intermediates=return_intermediates
         )
 
-    def get_finetune_features(self, x):
+    def get_finetune_features(self, x, feature_layer="encoder"):
         h = self.encode(x)
 
-        if self.ft_proj_selector == 0:
+        if feature_layer == "encoder":
             return h
 
-        features = self.project(h, return_intermediates=True)
+        projections = self.project(h, return_intermediates=True)
 
-        if self.ft_proj_selector == 1:
-            return features["projection_1"]
+        if feature_layer == "projection_1":
+            return projections["projection_1"]
 
-        return features["projection_2"]
+        if feature_layer == "projection_2":
+            return projections["projection_2"]
+
+        if feature_layer == "projection":
+            return projections["z"]
+
+        raise ValueError(
+            f"Unknown feature_layer: {feature_layer}. "
+            "Choose encoder, projection_1, projection_2, or projection."
+        )
 
     def forward(self, x, return_features=False):
         h = self.encode(x)
@@ -398,3 +407,37 @@ class SimCLRModelV2(nn.Module):
             "projection_2": projections["projection_2"],
             "z": projections["z"],
         }
+
+
+class SimCLRV2Classifier(nn.Module):
+    def __init__(
+        self,
+        backbone,
+        num_classes=10,
+        feature_layer="encoder",
+    ):
+        super().__init__()
+
+        self.backbone = backbone
+        self.feature_layer = feature_layer
+
+        feature_dims = {
+            "encoder": backbone.encoder.feature_dim,
+            "projection_1": backbone.projection_head.hidden_dim,
+            "projection_2": backbone.projection_head.hidden_dim,
+            "projection": backbone.projection_dim,
+        }
+
+        if feature_layer not in feature_dims:
+            raise ValueError(
+                f"Unsupported feature layer: {feature_layer}"
+            )
+
+        self.fc = nn.Linear(feature_dims[feature_layer], num_classes)
+
+    def forward(self, x):
+        features = self.backbone.get_finetune_features(
+            x,
+            feature_layer=self.feature_layer,
+        )
+        return self.fc(features)

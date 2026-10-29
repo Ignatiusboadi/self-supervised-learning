@@ -7,7 +7,7 @@ class LARS(Optimizer):
 
     def __init__(self, params, lr=0.3, momentum=0.9, weight_decay=1e-6,
                  eta=0.001, weight_decay_filter=True, lars_adaptation_filter=True, eps=1e-8, ):
-        self.name = "LARS"
+        self.name = "lars"
         if lr < 0:
             raise ValueError("lr must be non-negative")
         if momentum < 0:
@@ -69,7 +69,7 @@ class LARS(Optimizer):
 class SAM(torch.optim.Optimizer):
     """Sharness Aware Minimization with momentum."""
     def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
-        self.name = "SAM"
+        self.name = "sam"
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
@@ -106,12 +106,15 @@ class SAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
-        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
-        closure = torch.enable_grad()(closure)
+        if closure is None:
+            raise ValueError("SAM requires a closure that computes the loss and gradients.")
 
+        closure = torch.enable_grad()(closure)
+        loss = closure()
         self.first_step(zero_grad=True)
         closure()
-        self.second_step()
+        self.second_step(zero_grad=True)
+        return loss
 
     def _grad_norm(self):
         shared_device = self.param_groups[0]["params"][0].device
