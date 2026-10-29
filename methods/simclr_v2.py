@@ -408,8 +408,6 @@ class SimCLRModelV2(nn.Module):
             "z": projections["z"],
         }
 
-import torch.nn as nn
-
 
 class SSLClassifier(nn.Module):
     def __init__(
