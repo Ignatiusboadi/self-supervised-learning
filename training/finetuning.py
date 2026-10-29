@@ -6,64 +6,123 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 from tqdm.auto import tqdm
+
+from methods.simclr_v2 import SimCLRModelV2, SimCLRV2Classifier
 from utils.optimizer_factory import build_optimizer
 import torch.distributed as dist
 from sklearn.metrics import balanced_accuracy_score, f1_score
 
 
-def load_pretrained(checkpoint_path, resnet_variant="resnet18", num_classes=10):
+def load_pretrained(checkpoint_path, resnet_variant="resnet18", num_classes=10, ssl_type="simclr",
+                    feature_layer="encoder"):
     checkpoint_path = Path(checkpoint_path)
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Encoder checkpoint not found: {checkpoint_path}")
-    if resnet_variant == "resnet18":
-        model = models.resnet18(weights=None)
-    elif resnet_variant == "resnet50":
-        model = models.resnet50(weights=None)
-    else:
-        raise ValueError(
-            f"Unsupported backbone: {resnet_variant}. "
-            "Choose 'resnet18' or 'resnet50'."
+
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True, )
+    if ssl_type == "simclr":
+        if resnet_variant == "resnet18":
+            model = models.resnet18(weights=None)
+        elif resnet_variant == "resnet50":
+            model = models.resnet50(weights=None)
+        else:
+            raise ValueError(
+                f"Unsupported backbone: {resnet_variant}. "
+                "Choose 'resnet18' or 'resnet50'."
+            )
+        model.load_state_dict(checkpoint)
+        model.fc = nn.Identity()
+        feature_dim = model.fc.in_features if isinstance(model.fc, nn.Linear) else (
+            512 if resnet_variant == "resnet18" else 2048)
+        model.fc = nn.Linear(feature_dim, num_classes)
+    elif ssl_type == "simclr_v2":
+        backbone = SimCLRModelV2(
+            resnet_variant="resnet50",
+            width_multiplier=1,
+            use_sk=False,
+            projection_dim=128,
+            small_image_stem=True,
         )
 
-    model.fc = nn.Identity()
+        backbone.load_state_dict(
+            checkpoint["model_state_dict"],
+            strict=True,
+        )
 
-    state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True, )
-    model.load_state_dict(state_dict)
-    feature_dim = model.fc.in_features if isinstance(model.fc, nn.Linear) else (
-        512 if resnet_variant == "resnet18" else 2048)
-    model.fc = nn.Linear(feature_dim, num_classes)
+        model = SimCLRV2Classifier(
+            backbone=backbone,
+            num_classes=10,
+            feature_layer=feature_layer,
+        )
     return model
 
 
-def configure_trainable_layers(model, strategy, unfreeze_backbone=False):
-    """Set requires_grad according to the selected strategy."""
+def configure_trainable_layers(model, strategy, feature_layer="encoder", unfreeze_backbone=False, ):
+    model = model.module if hasattr(model, "module") else model
     for parameter in model.parameters():
         parameter.requires_grad = False
+    for parameter in model.fc.parameters():
+        parameter.requires_grad = True
+
+    backbone = getattr(model, "backbone", None)
+
+    if backbone is None:
+        if strategy == "full":
+            for parameter in model.parameters():
+                parameter.requires_grad = True
+        elif strategy == "freeze_then_full" and unfreeze_backbone:
+            for parameter in model.parameters():
+                parameter.requires_grad = True
+        elif strategy == "partial":
+            for parameter in model.layer4.parameters():
+                parameter.requires_grad = True
+        return
+
+    encoder = backbone.encoder
+    projection_head = backbone.projection_head
+    if feature_layer == "encoder":
+        required_projection_parts = []
+    elif feature_layer == "projection_1":
+        required_projection_parts = ["fc1", "bn1"]
+    elif feature_layer == "projection_2":
+        required_projection_parts = ["fc1", "bn1", "fc2", "bn2"]
+
+    else:
+        required_projection_parts = ["fc1", "bn1", "fc2", "bn2", "fc3"]
+
+    for name, parameter in projection_head.named_parameters():
+        parameter.requires_grad = any(
+            name == part or name.startswith(part + ".") for part in required_projection_parts) and False
 
     if strategy == "full":
-        for parameter in model.parameters():
+        for parameter in encoder.parameters():
+            parameter.requires_grad = True
+        for name, parameter in projection_head.named_parameters():
+            if any(name == part or name.startswith(part + ".") for part in required_projection_parts):
+                parameter.requires_grad = True
+
+        for parameter in model.fc.parameters():
             parameter.requires_grad = True
 
     elif strategy == "freeze_then_full":
         if unfreeze_backbone:
-            for parameter in model.parameters():
-                parameter.requires_grad = True
-        else:
-            for parameter in model.fc.parameters():
+            for parameter in encoder.parameters():
                 parameter.requires_grad = True
 
-    elif strategy == "linear_probe":
-        for parameter in model.fc.parameters():
-            parameter.requires_grad = True
+            for name, parameter in projection_head.named_parameters():
+                if any(name == part or name.startswith(part + ".") for part in required_projection_parts):
+                    parameter.requires_grad = True
 
     elif strategy == "partial":
-        for parameter in model.layer4.parameters():
-            parameter.requires_grad = True
-        for parameter in model.fc.parameters():
+        if not hasattr(encoder, "layer4"):
+            raise ValueError("Partial fine-tuning requires an encoder with a layer4 stage.")
+
+        for parameter in encoder.layer4.parameters():
             parameter.requires_grad = True
 
-    else:
-        raise ValueError(f"Unknown fine-tuning strategy: {strategy}")
+        for name, parameter in projection_head.named_parameters():
+            if any(name == part or name.startswith(part + ".") for part in required_projection_parts):
+                parameter.requires_grad = True
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
