@@ -7,6 +7,7 @@ from utils.distributed import setup_runtime, cleanup_runtime
 def build_parser():
     parser = argparse.ArgumentParser(description="Self-supervised pretraining and downstream fine-tuning")
 
+    parser.add_argument("--experiment-name", type=str, default=None)
     parser.add_argument("--mode", choices=["pretrain", "finetune"], required=True,
         help="Training workflow to execute", )
     parser.add_argument("--model", choices=["resnet18", "resnet50"], default="resnet18",
@@ -47,7 +48,12 @@ def build_parser():
     parser.add_argument("--strategies", nargs="+",
                         choices=["full", "freeze_then_full", "linear_probe", "partial"], default=None,
                         help="Run multiple fine-tuning strategies", )
-    parser.add_argument("--ssl-type", default="simclr")
+    parser.add_argument("--ssl-type", default="simclr", choices=["simclr", "simclrv2"])
+    parser.add_argument("--width-multiplier", type=int, default=1)
+    parser.add_argument("--use-sk", type=bool, default=False)
+    parser.add_argument("--small-image-stem", type=bool, default=True)
+    parser.add_argument("--simclrv2-selector", type=int, default=0)
+    parser.add_argument("--projection-dim", type=int, default=128)
 
     return parser
 
