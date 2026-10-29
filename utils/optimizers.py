@@ -106,12 +106,15 @@ class SAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
-        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
-        closure = torch.enable_grad()(closure)
+        if closure is None:
+            raise ValueError("SAM requires a closure that computes the loss and gradients.")
 
+        closure = torch.enable_grad()(closure)
+        loss = closure()
         self.first_step(zero_grad=True)
         closure()
-        self.second_step()
+        self.second_step(zero_grad=True)
+        return loss
 
     def _grad_norm(self):
         shared_device = self.param_groups[0]["params"][0].device
