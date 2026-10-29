@@ -407,3 +407,39 @@ class SimCLRModelV2(nn.Module):
             "projection_2": projections["projection_2"],
             "z": projections["z"],
         }
+
+import torch.nn as nn
+
+
+class SSLClassifier(nn.Module):
+    def __init__(
+        self,
+        backbone,
+        num_classes=10,
+        feature_layer="encoder",
+    ):
+        super().__init__()
+
+        self.backbone = backbone
+        self.feature_layer = feature_layer
+
+        feature_dims = {
+            "encoder": backbone.encoder.feature_dim,
+            "projection_1": backbone.projection_head.hidden_dim,
+            "projection_2": backbone.projection_head.hidden_dim,
+            "projection": backbone.projection_dim,
+        }
+
+        if feature_layer not in feature_dims:
+            raise ValueError(
+                f"Unsupported feature layer: {feature_layer}"
+            )
+
+        self.fc = nn.Linear(feature_dims[feature_layer], num_classes)
+
+    def forward(self, x):
+        features = self.backbone.get_finetune_features(
+            x,
+            feature_layer=self.feature_layer,
+        )
+        return self.fc(features)
