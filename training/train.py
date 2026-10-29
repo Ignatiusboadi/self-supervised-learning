@@ -24,22 +24,35 @@ def train_one_epoch(model, train_loader, optimizer, device, global_step,
 
         optimizer.zero_grad(set_to_none=True)
         x = torch.cat([x_i, x_j], dim=0)
-        z = model(x)
-        z_i, z_j = z.chunk(2)
 
-        loss = nt_xent_loss(z_i, z_j, temperature=temperature, )
-        loss.backward()
+        if optimizer.name == "sam":
+            first_pass = {}
 
-        if optimizer.name == "SAM":
-            optimizer.first_step(zero_grad=True)
+            def closure():
+                optimizer.zero_grad(set_to_none=True)
+                z = model(x)
+                z_i, z_j = z.chunk(2)
+
+                loss = nt_xent_loss(z_i, z_j, temperature=temperature, )
+                loss.backward()
+                if not first_pass:
+                    first_pass["loss"] = loss.detach()
+                return loss
+
             disable_bn_running_stats(model)
-            z_perturbed = model(torch.cat([x_i, x_j], dim=0))
-            z_i_perturbed, z_j_perturbed = z_perturbed.chunk(2)
-            loss_perturbed = nt_xent_loss(z_i_perturbed, z_j_perturbed, temperature=temperature)
-            loss_perturbed.backward()
-            enable_bn_running_stats(model)
-            optimizer.second_step(zero_grad=True)
+            try:
+                optimizer.step(closure)
+            finally:
+                enable_bn_running_stats(model)
+            loss = first_pass["loss"]
+
         else:
+            optimizer.zero_grad(set_to_none=True)
+            z = model(x)
+            z_i, z_j = z.chunk(2)
+
+            loss = nt_xent_loss(z_i, z_j, temperature=temperature, )
+            loss.backward()
             optimizer.step()
 
         current_batch_size = x_i.size(0)
