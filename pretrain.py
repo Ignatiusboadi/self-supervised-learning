@@ -5,16 +5,16 @@ from torchvision.datasets import ImageFolder
 
 from data_pipeline.augmentations import simclr_train_transforms
 from data_pipeline.datasets import SimCLRDataset
-from data_pipeline.gpu_simclr_data import load_uint8_images, GPUSimCLRLoader
+from data_pipeline.gpu_pretrain_data import get_simclr_pretraining_loader
 from utils.distributed import Runtime, setup_runtime, wrap_model
 from utils.optimizers import LARS, SAM
 from utils.plotting import plot_fig
 from training.train import train_one_epoch
 from methods.simclr import SimCLRModel
+from methods.simclr_v2 import SimCLRModelV2
 
 
 def run_pretraining(args, runtime: Runtime):
-    data_path = args.data_path or f"{args.root_dir}/data/{args.data}/train"
     output_root = Path(args.output_dir or f"{args.root_dir}/outputs")
     checkpoint_dir = output_root / "checkpoints" / args.ssl_type
     plot_dir = output_root / "plots" / args.ssl_type
@@ -34,8 +34,9 @@ def run_pretraining(args, runtime: Runtime):
     if device.type == "cuda":
         torch.cuda.manual_seed_all(args.seed)
 
-    base_dataset = ImageFolder(root=data_path, transform=None, )
     if args.train_cache_path is None:
+        data_path = args.data_path or f"{args.root_dir}/data/{args.data}/train"
+        base_dataset = ImageFolder(root=data_path, transform=None, )
         dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
         sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
                                       shuffle=True, drop_last=True)
@@ -45,12 +46,15 @@ def run_pretraining(args, runtime: Runtime):
                             persistent_workers=(args.num_workers > 0))
     else:
         cache_path = args.train_cache_path
-        data = load_uint8_images(base_dataset, cache_path=cache_path)
-        loader = GPUSimCLRLoader(data, batch_size=batch_size, device=device, blur=True)
+        loader, cache = get_simclr_pretraining_loader(data_dir=args.data_path, cache_path=cache_path, device=device,
+                                                      batch_size=args.batch_size, img_size=args.image_size, )
 
-
-    model = SimCLRModel(resnet_variant=args.model) #  .to(device)
-    model = wrap_model(model, runtime)
+    if args.ssl_type.lower() == "simclr":
+        model = SimCLRModel(resnet_variant=args.model) #  .to(device)
+        model = wrap_model(model, runtime)
+    elif args.ssl_type.lower() == "simclrv2":
+        model = SimCLRModelV2(resnet_variant=args.model)
+        model = wrap_model(model, runtime)
 
     if args.optimizer is None:
         optimizer_name = "lars"
@@ -113,27 +117,46 @@ def run_pretraining(args, runtime: Runtime):
 
             print(f"Epoch [{epoch + 1}/{num_epochs}] Loss: {epoch_loss:.4f} LR: {epoch_lrs[-1]:.6f}")
     if runtime.is_main:
-        checkpoint_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_checkpoint.pth")
-        encoder_path = (checkpoint_dir / f"simclr_{args.model}_{args.optimizer}_encoder.pth")
+        checkpoint_path = (checkpoint_dir / f"{args.experiment_name}_checkpoint.pth")
+        encoder_path = (checkpoint_dir / f"{args.experiment_name}_encoder.pth")
         model_to_save = model.module if runtime.distributed else model
 
-        plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", "SimCLR Training Loss",
-                 str(plot_dir / f"{args.model}_{args.optimizer}_loss.png"), )
+        plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", f"{args.experiment_name}_SimCLR Training Loss",
+                 str(plot_dir / f"{args.experiment_name}_loss.png"), )
         plot_fig(learning_rates, "Training step", "Learning rate",
-            "LR: warm-up + cosine decay", str(plot_dir / f"{args.model}_{args.optimizer}_lr.png"), )
-
-        torch.save(
-            {
-                "model_state_dict": model_to_save.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "epochs": num_epochs,
-                "global_step": global_step,
-                "train_losses": train_losses,
-                "model": args.model,
-                "optimizer": optimizer_name,
-            },
-            checkpoint_path, )
-        torch.save(model_to_save.encoder.state_dict(), encoder_path)
+            f"{args.experiment_name}_LR: warm-up + cosine decay", str(plot_dir / f"{args.experiment_name}_lr.png"), )
+        if args.ssl_type == "simclr":
+            torch.save(
+                {
+                    "model_state_dict": model_to_save.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "epochs": num_epochs,
+                    "global_step": global_step,
+                    "train_losses": train_losses,
+                    "model": args.model,
+                    "optimizer": optimizer_name,
+                },
+                checkpoint_path, )
+            torch.save(model_to_save.encoder.state_dict(), encoder_path)
+        elif args.ssl_type == "simclr_v2":
+            torch.save(
+                {
+                    "model_state_dict": model.module.state_dict()
+                    if hasattr(model, "module")
+                    else model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "epoch": epoch + 1,
+                    "global_step": global_step,
+                    "model_config": {
+                        "resnet_variant": args.resnet_variant,
+                        "width_multiplier": args.width_multiplier,
+                        "use_sk": args.use_sk,
+                        "projection_dim": args.projection_dim,
+                        "small_image_stem": args.small_image_stem,
+                    },
+                },
+                checkpoint_path,
+            )
 
         print(f"Checkpoint saved to: {checkpoint_path}")
         print(f"Encoder saved to: {encoder_path}")
