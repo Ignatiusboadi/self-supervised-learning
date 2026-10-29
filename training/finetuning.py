@@ -202,6 +202,7 @@ def fit_finetuning(
     val_loader,
     device,
     output_dir,
+    feature_layer="encoder",
     strategy="full",
     num_epochs=30,
     freeze_epochs=10,
@@ -255,15 +256,13 @@ def fit_finetuning(
     best_path = output_dir / "best_model.pth"
 
     for epoch in range(num_epochs):
-        unfreeze_backbone = (
-            strategy == "freeze_then_full"
-            and epoch >= freeze_epochs
-        )
+        unfreeze_backbone = (strategy == "freeze_then_full" and epoch >= freeze_epochs)
 
         configure_trainable_layers(
             model,
             strategy,
             unfreeze_backbone=unfreeze_backbone,
+            feature_layer=feature_layer,
         )
 
         train_loss, train_accuracy = train_one_epoch(
