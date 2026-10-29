@@ -26,7 +26,7 @@ def run_finetuning(args, runtime: Runtime):
     if checkpoint_path is None:
         checkpoint_path = (
             root / "outputs" / "checkpoints" / args.ssl_type
-            / f"simclr_{args.model}_encoder.pth"
+            / f"{args.experiment_name}_encoder.pth"
         )
 
     checkpoint_path = Path(checkpoint_path)
@@ -47,13 +47,11 @@ def run_finetuning(args, runtime: Runtime):
 
     for strategy in strategies:
         for fraction in args.data_fraction:
-            fraction_name = f"{int(fraction * 100)}pct"
-            experiment_name = f"{args.model}_{strategy}_{fraction_name}"
-            output_dir = output_root / experiment_name
+            output_dir = output_root / args.experiment_name
             output_dir.mkdir(parents=True, exist_ok=True)
 
             print("\n" + "=" * 70)
-            print(f"Experiment: {experiment_name}")
+            print(f"Experiment: {args.experiment_name}")
             print(f"Checkpoint: {checkpoint_path}")
             print("=" * 70)
 
@@ -77,6 +75,8 @@ def run_finetuning(args, runtime: Runtime):
                 checkpoint_path=str(checkpoint_path),
                 resnet_variant=args.model,
                 num_classes=len(classes),
+                ssl_type=args.ssl_type,
+                feature_layer=args.feature_layer,
             )
 
             model, history = fit_finetuning(
@@ -92,15 +92,16 @@ def run_finetuning(args, runtime: Runtime):
                 learning_rate=learning_rate,
                 weight_decay=weight_decay,
                 opt_name=optimizer_name,
+                feature_layer=args.feature_layer,
             )
 
             plot_fig(history["val_loss"], "Epoch", "Validation Loss",
-                     f"{experiment_name} Fine-Tuning validation Loss",
-                     str(plot_dir / f"{experiment_name}_train_loss.png"))
+                     f"{args.experiment_name} Fine-Tuning validation Loss",
+                     str(plot_dir / f"{args.experiment_name}_train_loss.png"))
 
             plot_fig(history["val_macro_f1"], "Epoch", "Validation F1 (macro-average) (%)",
-                     f"{experiment_name} Fine-Tuning Training F1 Macro-average",
-                     str(plot_dir / f"{experiment_name}_train_f1_macro.png"))
+                     f"{args.experiment_name} Fine-Tuning Training F1 Macro-average",
+                     str(plot_dir / f"{args.experiment_name}_train_f1_macro.png"))
 
             metrics = evaluate_model(
                 model=model, test_loader=test_loader, classes=classes, device=device,
@@ -130,7 +131,7 @@ def run_finetuning(args, runtime: Runtime):
             )
 
             if is_main_process:
-                with open(output_dir / f"{experiment_name}_results.json", "w") as f:
+                with open(output_dir / f"{args.experiment_name}_results.json", "w") as f:
                     json.dump(results, f, indent=2)
 
             all_results.append(results)
@@ -147,7 +148,7 @@ def run_finetuning(args, runtime: Runtime):
         for result in all_results
     ]
 
-    summary_path = output_root / f"{experiment_name}_summary.json"
+    summary_path = output_root / f"{args.experiment_name}_summary.json"
 
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
