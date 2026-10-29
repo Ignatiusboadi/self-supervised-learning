@@ -409,7 +409,7 @@ class SimCLRModelV2(nn.Module):
         }
 
 
-class SSLClassifier(nn.Module):
+class SimCLRV2Classifier(nn.Module):
     def __init__(
         self,
         backbone,
