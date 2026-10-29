@@ -141,11 +141,9 @@ def run_pretraining(args, runtime: Runtime):
         elif args.ssl_type == "simclr_v2":
             torch.save(
                 {
-                    "model_state_dict": model.module.state_dict()
-                    if hasattr(model, "module")
-                    else model.state_dict(),
+                    "model_state_dict": model_to_save.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
-                    "epoch": epoch + 1,
+                    "epochs": num_epochs,
                     "global_step": global_step,
                     "model_config": {
                         "resnet_variant": args.resnet_variant,
@@ -159,4 +157,4 @@ def run_pretraining(args, runtime: Runtime):
             )
 
         print(f"Checkpoint saved to: {checkpoint_path}")
-        print(f"Encoder saved to: {encoder_path}")
+        # print(f"Encoder saved to: {encoder_path}")
