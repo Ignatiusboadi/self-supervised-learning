@@ -37,6 +37,8 @@ def cache_imagefolder(split_dir, cache_path, size=None, labeled=True, num_thread
 
 # cache_imagefolder(r"/Users/ignatiusboadi/Documents/Pycharm_Projects/self_supervised_learning/data/cifar10/train",
 #                   "cifar10_train_u8.pt", labeled=True, overwrite=True)
+# cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\imb_cifar\imbalance_100",
+#                   "cifar10_train_imb100_u8.pt", labeled=True, overwrite=True)
 # cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\cifar10\test",
 #                   "cifar10_test_u8.pt", labeled=False, overwrite=True)
 # cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\cifar10\train",
