@@ -51,7 +51,7 @@ def run_finetuning(args, runtime: Runtime):
             output_dir.mkdir(parents=True, exist_ok=True)
 
             print("\n" + "=" * 70)
-            print(f"Experiment: {args.experiment_name}")
+            print(f"Experiment: {args.experiment_name} - {strategy} {fraction}")
             print(f"Checkpoint: {checkpoint_path}")
             print("=" * 70)
 
@@ -95,13 +95,15 @@ def run_finetuning(args, runtime: Runtime):
                 feature_layer=args.feature_layer,
             )
 
-            plot_fig(history["val_loss"], "Epoch", "Validation Loss",
-                     f"{strategy}_{fraction} Fine-Tuning validation Loss",
-                     str(plot_dir / f"{args.experiment_name}_{strategy}_{fraction}_train_loss.png"))
+            plot_fig("Epoch", "Validation Loss",
+                     f"Fine-Tuning training & validation Loss",
+                     str(plot_dir / f"{args.ssl_type}/{args.experiment_name}_{strategy}_{fraction}_val_loss.png"),
+                     train_data=history["train_loss"], val_data=history["val_loss"])
 
-            plot_fig(history["val_macro_f1"], "Epoch", "Validation F1 (macro-average) (%)",
-                     f"{strategy}_{fraction} Fine-Tuning validation F1 Macro-average",
-                     str(plot_dir / f"{args.experiment_name}_{strategy}_{fraction}_train_f1_macro.png"))
+            plot_fig("Epoch", "Validation F1 (macro-average) (%)",
+                     f"Fine-Tuning validation F1 Macro-average",
+                     str(plot_dir / f"{args.ssl_type}/{args.experiment_name}_{strategy}_{fraction}_val_f1_macro.png"),
+                     val_data=history["val_macro_f1"])
 
             metrics = evaluate_model(
                 model=model, test_loader=test_loader, classes=classes, device=device,
@@ -131,7 +133,7 @@ def run_finetuning(args, runtime: Runtime):
             )
 
             if is_main_process:
-                with open(output_dir / f"{args.experiment_name}_results.json", "w") as f:
+                with open(output_dir / f"{args.experiment_name}_{strategy}_{fraction}_results.json", "w") as f:
                     json.dump(results, f, indent=2)
 
             all_results.append(results)
