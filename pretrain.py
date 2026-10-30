@@ -146,7 +146,7 @@ def run_pretraining(args, runtime: Runtime):
                     "epochs": num_epochs,
                     "global_step": global_step,
                     "model_config": {
-                        "resnet_variant": args.resnet_variant,
+                        "resnet_variant": args.model,
                         "width_multiplier": args.width_multiplier,
                         "use_sk": args.use_sk,
                         "projection_dim": args.projection_dim,
