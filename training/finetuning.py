@@ -115,7 +115,8 @@ def configure_trainable_layers(model, strategy, feature_layer="encoder", unfreez
                 parameter.requires_grad = True
 
 
-def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
+def train_one_epoch(model, loader, optimizer, criterion, device, epoch,
+                    opt_name):
     model.train()
     for module in model.modules():
         if isinstance(module, nn.modules.batchnorm._BatchNorm):
@@ -136,7 +137,7 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
 
         optimizer.zero_grad(set_to_none=True)
 
-        if optimizer.name == "sam":
+        if opt_name == "sam":
             first_pass = {}
 
             def closure():
@@ -263,6 +264,7 @@ def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_
             criterion=criterion,
             device=device,
             epoch=epoch,
+            opt_name=opt_name
         )
 
         current_lr = optimizer.param_groups[0]["lr"]
