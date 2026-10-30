@@ -96,12 +96,12 @@ def run_finetuning(args, runtime: Runtime):
             )
 
             plot_fig(history["val_loss"], "Epoch", "Validation Loss",
-                     f"{args.experiment_name} Fine-Tuning validation Loss",
-                     str(plot_dir / f"{args.experiment_name}_train_loss.png"))
+                     f"{strategy}_{fraction} Fine-Tuning validation Loss",
+                     str(plot_dir / f"{args.experiment_name}_{strategy}_{fraction}_train_loss.png"))
 
             plot_fig(history["val_macro_f1"], "Epoch", "Validation F1 (macro-average) (%)",
-                     f"{args.experiment_name} Fine-Tuning Training F1 Macro-average",
-                     str(plot_dir / f"{args.experiment_name}_train_f1_macro.png"))
+                     f"{strategy}_{fraction} Fine-Tuning validation F1 Macro-average",
+                     str(plot_dir / f"{args.experiment_name}_{strategy}_{fraction}_train_f1_macro.png"))
 
             metrics = evaluate_model(
                 model=model, test_loader=test_loader, classes=classes, device=device,
