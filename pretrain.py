@@ -138,7 +138,7 @@ def run_pretraining(args, runtime: Runtime):
                 },
                 checkpoint_path, )
             torch.save(model_to_save.encoder.state_dict(), encoder_path)
-        elif args.ssl_type == "simclr_v2":
+        elif args.ssl_type == "simclrv2":
             torch.save(
                 {
                     "model_state_dict": model_to_save.state_dict(),
