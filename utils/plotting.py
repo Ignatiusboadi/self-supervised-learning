@@ -34,5 +34,3 @@ def plot_fig(
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(savefig, dpi=300)
-    plt.show()
-    plt.close()
