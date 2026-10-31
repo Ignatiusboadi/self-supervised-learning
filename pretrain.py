@@ -50,7 +50,7 @@ def run_pretraining(args, runtime: Runtime):
                                                       batch_size=args.batch_size, img_size=args.image_size, )
 
     if args.ssl_type.lower() == "simclr":
-        model = SimCLRModel(resnet_variant=args.model) #  .to(device)
+        model = SimCLRModel(resnet_variant=args.model)  #  .to(device)
         model = wrap_model(model, runtime)
     elif args.ssl_type.lower() == "simclrv2":
         model = SimCLRModelV2(resnet_variant=args.model)
@@ -63,12 +63,12 @@ def run_pretraining(args, runtime: Runtime):
 
     if optimizer_name == "lars":
         optimizer = LARS(model.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay,
-                         eta=args.eta,weight_decay_filter=True, lars_adaptation_filter=True, )
+                         eta=args.eta, weight_decay_filter=True, lars_adaptation_filter=True, )
     elif optimizer_name == "sam":
         optimizer = SAM(model.parameters(), torch.optim.SGD, lr=base_lr, momentum=momentum, weight_decay=weight_decay,
                         rho=args.sam_rho, )
     elif optimizer_name == "sgd":
-        optimizer = torch.optim.SGD(model.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay,)
+        optimizer = torch.optim.SGD(model.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay, )
     elif optimizer_name == "adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=base_lr, weight_decay=weight_decay, )
     elif optimizer_name == "adamw":
@@ -79,10 +79,10 @@ def run_pretraining(args, runtime: Runtime):
     steps_per_epoch = len(loader)
     if steps_per_epoch == 0:
         raise ValueError("The DataLoader has no batches. Reduce the batch size "
-            "or check the dataset and drop_last setting.")
+                         "or check the dataset and drop_last setting.")
 
     total_steps = num_epochs * steps_per_epoch
-    warmup_steps = min(int(num_epochs * args.warmup_epochs) * steps_per_epoch, total_steps - 1,)
+    warmup_steps = min(int(num_epochs * args.warmup_epochs) * steps_per_epoch, total_steps - 1, )
 
     train_losses = []
     learning_rates = []
@@ -121,10 +121,12 @@ def run_pretraining(args, runtime: Runtime):
         encoder_path = (checkpoint_dir / f"{args.experiment_name}_encoder.pth")
         model_to_save = model.module if runtime.distributed else model
 
-        plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", f"{args.experiment_name}_SimCLR Training Loss",
-                 str(plot_dir / f"{args.experiment_name}_loss.png"), )
-        plot_fig(learning_rates, "Training step", "Learning rate",
-            f"{args.experiment_name}_LR: warm-up + cosine decay", str(plot_dir / f"{args.experiment_name}_lr.png"), )
+        plot_fig("Epoch", "Mean NT-Xent Loss", f"{args.experiment_name}_SimCLR Training Loss",
+                 str(plot_dir / f"{args.experiment_name}_loss.png"), train_losses, )
+        plot_fig("Training step", "Learning rate",
+                 f"{args.experiment_name}_LR: warm-up + cosine decay",
+                 str(plot_dir / f"{args.experiment_name}_lr.png"),
+                 learning_rates, )
         if args.ssl_type == "simclr":
             torch.save(
                 {
