@@ -50,10 +50,15 @@ def run_pretraining(args, runtime: Runtime):
                                                       batch_size=args.batch_size, img_size=args.image_size, )
 
     if args.ssl_type.lower() == "simclr":
-        model = SimCLRModel(resnet_variant=args.model)  #  .to(device)
+        proj_dim = args.projection_dim if args.projection_dim else 128
+        model = SimCLRModel(resnet_variant=args.model, projection_dim=proj_dim)  #  .to(device)
         model = wrap_model(model, runtime)
     elif args.ssl_type.lower() == "simclrv2":
-        model = SimCLRModelV2(resnet_variant=args.model)
+        proj_dim = args.projection_dim if args.projection_dim else 128
+        model = SimCLRModelV2(resnet_variant=args.model, projection_dim=proj_dim,
+                              width_multiplier=args.width_multiplier, use_sk=args.use_sk,
+                              small_image_stem=args.small_image_stem,
+                              )
         model = wrap_model(model, runtime)
 
     if args.optimizer is None:
@@ -137,6 +142,7 @@ def run_pretraining(args, runtime: Runtime):
                     "train_losses": train_losses,
                     "model": args.model,
                     "optimizer": optimizer_name,
+                    "projection_dim": proj_dim
                 },
                 checkpoint_path, )
             torch.save(model_to_save.encoder.state_dict(), encoder_path)
