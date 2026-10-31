@@ -121,10 +121,11 @@ def run_pretraining(args, runtime: Runtime):
         encoder_path = (checkpoint_dir / f"{args.experiment_name}_encoder.pth")
         model_to_save = model.module if runtime.distributed else model
 
-        plot_fig(train_losses, "Epoch", "Mean NT-Xent Loss", f"{args.experiment_name}_SimCLR Training Loss",
-                 str(plot_dir / f"{args.experiment_name}_loss.png"), )
-        plot_fig(learning_rates, "Training step", "Learning rate",
-            f"{args.experiment_name}_LR: warm-up + cosine decay", str(plot_dir / f"{args.experiment_name}_lr.png"), )
+        plot_fig("Epoch", "Mean NT-Xent Loss", f"{args.experiment_name}_SimCLR Training Loss",
+                 str(plot_dir / f"{args.experiment_name}_loss.png"), train_losses, )
+        plot_fig("Training step", "Learning rate",
+            f"{args.experiment_name}_LR: warm-up + cosine decay", str(plot_dir / f"{args.experiment_name}_lr.png"),
+                 learning_rates, )
         if args.ssl_type == "simclr":
             torch.save(
                 {
