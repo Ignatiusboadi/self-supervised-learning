@@ -7,7 +7,8 @@ from utils.optimizers import disable_bn_running_stats, enable_bn_running_stats
 
 
 def train_one_epoch(model, train_loader, optimizer, device, global_step,
-    total_steps, warmup_steps, peak_lr, epoch, num_epochs, temperature=0.5, ):
+    total_steps, warmup_steps, peak_lr, epoch, num_epochs, temperature=0.5,
+                    optimizer_name="lars"):
     model.train()
 
     running_loss = 0.0
@@ -25,7 +26,7 @@ def train_one_epoch(model, train_loader, optimizer, device, global_step,
         optimizer.zero_grad(set_to_none=True)
         x = torch.cat([x_i, x_j], dim=0)
 
-        if optimizer.name == "sam":
+        if optimizer_name == "sam":
             first_pass = {}
 
             def closure():

@@ -110,6 +110,7 @@ def run_pretraining(args, runtime: Runtime):
             epoch=epoch,
             num_epochs=num_epochs,
             temperature=args.temperature,
+            optimizer_name=optimizer_name
         )
 
         if runtime.distributed:
