@@ -1,20 +1,17 @@
 from typing import Optional
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-
 class SelectiveKernelConv(nn.Module):
-
     def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        stride: int = 1,
-        reduction: int = 16,
-        min_dim: int = 32,
+            self,
+            in_channels: int,
+            out_channels: int,
+            stride: int = 1,
+            reduction: int = 16,
+            min_dim: int = 32,
     ):
         super().__init__()
 
@@ -80,13 +77,13 @@ class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(
-        self,
-        in_channels: int,
-        planes: int,
-        stride: int = 1,
-        use_sk: bool = False,
-        groups: int = 1,
-        base_width: int = 64,
+            self,
+            in_channels: int,
+            planes: int,
+            stride: int = 1,
+            use_sk: bool = False,
+            groups: int = 1,
+            base_width: int = 64,
     ):
         super().__init__()
 
@@ -152,7 +149,6 @@ class Bottleneck(nn.Module):
         return self.relu(out)
 
 
-
 class SimCLRResNetEncoder(nn.Module):
     RESNETS = {
         'resnet18': 18,
@@ -170,12 +166,12 @@ class SimCLRResNetEncoder(nn.Module):
     }
 
     def __init__(
-        self,
-        resnet_variant: str = "resnet18",
-        width_multiplier: int = 1,
-        use_sk: bool = False,
-        in_channels: int = 3,
-        small_image_stem: bool = False,
+            self,
+            resnet_variant: str = "resnet18",
+            width_multiplier: int = 1,
+            use_sk: bool = False,
+            in_channels: int = 3,
+            small_image_stem: bool = False,
     ):
         super().__init__()
 
@@ -290,10 +286,10 @@ class SimCLRResNetEncoder(nn.Module):
 
 class ProjectionHead(nn.Module):
     def __init__(
-        self,
-        input_dim: int,
-        projection_dim: int = 128,
-        hidden_dim: Optional[int] = None,
+            self,
+            input_dim: int,
+            projection_dim: int = 128,
+            hidden_dim: Optional[int] = None,
     ):
         super().__init__()
 
@@ -328,14 +324,14 @@ class ProjectionHead(nn.Module):
 
 class SimCLRModelV2(nn.Module):
     def __init__(
-        self,
-        resnet_variant: str = "resnet18",
-        width_multiplier: int = 1,
-        use_sk: bool = False,
-        projection_dim: int = 128,
-        hidden_dim: Optional[int] = None,
-        small_image_stem: bool = False,
-        ft_proj_selector: int = 0,
+            self,
+            resnet_variant: str = "resnet18",
+            width_multiplier: int = 1,
+            use_sk: bool = False,
+            projection_dim: int = 128,
+            hidden_dim: Optional[int] = None,
+            small_image_stem: bool = False,
+            ft_proj_selector: int = 0,
     ):
         super().__init__()
 
@@ -411,10 +407,10 @@ class SimCLRModelV2(nn.Module):
 
 class SimCLRV2Classifier(nn.Module):
     def __init__(
-        self,
-        backbone,
-        num_classes=10,
-        feature_layer="encoder",
+            self,
+            backbone,
+            num_classes=10,
+            feature_layer="encoder",
     ):
         super().__init__()
 
