@@ -50,12 +50,14 @@ def build_parser():
                         help="Run multiple fine-tuning strategies", )
     parser.add_argument("--ssl-type", default="simclr", choices=["simclr", "simclrv2"])
     parser.add_argument("--width-multiplier", type=int, default=1)
-    parser.add_argument("--use-sk", type=bool, default=False)
-    parser.add_argument("--small-image-stem", type=bool, default=True)
+    parser.add_argument("--use-sk", action="store_true", )
+    parser.add_argument("--small-image-stem", action="store_true", )
     parser.add_argument("--simclrv2-selector", type=int, default=0)
     parser.add_argument("--projection-dim", type=int, default=128)
     parser.add_argument("--feature-layer", type=str, default="encoder",
                         choices=["encoder", "projection_1", "projection_2", "projection"])
+    parser.add_argument("--in-channels", type=int, default=3)
+    parser.add_argument("--projection-hidden-dim", type=int, default=512)
 
     return parser
 
