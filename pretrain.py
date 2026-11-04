@@ -59,9 +59,7 @@ def run_pretraining(args, runtime: Runtime):
     #     model = SimCLRModelV2(resnet_variant=args.model, projection_dim=proj_dim,
     #                           width_multiplier=args.width_multiplier, use_sk=args.use_sk,
     #                           small_image_stem=args.small_image_stem,)
-    model = SimCLR(resnet_variant=args.model, width_multiplier=args.width_multiplier, use_sk=args.use_sk,
-        small_image_stem=args.small_image_stem, in_channels=3, projection_dim=128, projection_layers=2,
-        projection_hidden_dim=None, zero_init_residual=False)
+    model = SimCLR()
     model = wrap_model(model, runtime)
 
     if args.optimizer is None:
