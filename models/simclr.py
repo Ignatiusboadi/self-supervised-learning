@@ -6,8 +6,8 @@ from models.projection_head import ProjectionHead
 
 class SimCLR(nn.Module):
     def __init__(self, resnet_variant="resnet18", width_multiplier=1, use_sk=False,
-        small_image_stem=False, in_channels=3, projection_dim=128, projection_layers=2,
-        projection_hidden_dim=512, zero_init_residual=False,):
+                 small_image_stem=False, in_channels=3, projection_dim=128, projection_layers=2,
+                 projection_hidden_dim=512, zero_init_residual=False, ):
         super().__init__()
 
         self.encoder = SimCLRResNetEncoder(resnet_variant=resnet_variant, width_multiplier=width_multiplier,
