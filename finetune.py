@@ -146,6 +146,10 @@ def run_finetuning(args, runtime: Runtime):
             "data_fraction": result["data_fraction"],
             "test_loss": result["metrics"]["test_loss"],
             "test_accuracy": result["metrics"]["test_accuracy"],
+            "test_balanced_accuracy": result["metrics"]["balanced_accuracy"],
+            "test_macro_f1": result["metrics"]["macro_f1"],
+            "confusion_matrix": result["metrics"]["confusion_matrix"],
+            "metrics": result["metrics"],
         }
         for result in all_results
     ]
