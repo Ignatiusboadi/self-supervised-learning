@@ -12,6 +12,7 @@ from utils.plotting import plot_fig
 from training.train import train_one_epoch
 from methods.simclr import SimCLRModel
 from methods.simclr_v2 import SimCLRModelV2
+from models.simclr import SimCLR
 
 
 def run_pretraining(args, runtime: Runtime):
@@ -49,17 +50,19 @@ def run_pretraining(args, runtime: Runtime):
         loader, cache = get_simclr_pretraining_loader(data_dir=args.data_path, cache_path=cache_path, device=device,
                                                       batch_size=args.batch_size, img_size=args.image_size, )
 
-    if args.ssl_type.lower() == "simclr":
-        proj_dim = args.projection_dim if args.projection_dim else 128
-        model = SimCLRModel(resnet_variant=args.model, projection_dim=proj_dim)  #  .to(device)
-        model = wrap_model(model, runtime)
-    elif args.ssl_type.lower() == "simclrv2":
-        proj_dim = args.projection_dim if args.projection_dim else 128
-        model = SimCLRModelV2(resnet_variant=args.model, projection_dim=proj_dim,
-                              width_multiplier=args.width_multiplier, use_sk=args.use_sk,
-                              small_image_stem=args.small_image_stem,
-                              )
-        model = wrap_model(model, runtime)
+    # if args.ssl_type.lower() == "simclr":
+    #     proj_dim = args.projection_dim if args.projection_dim else 128
+    #     model = SimCLRModel(resnet_variant=args.model, projection_dim=proj_dim)  #  .to(device)
+    #     model = wrap_model(model, runtime)
+    # elif args.ssl_type.lower() == "simclrv2":
+    #     proj_dim = args.projection_dim if args.projection_dim else 128
+    #     model = SimCLRModelV2(resnet_variant=args.model, projection_dim=proj_dim,
+    #                           width_multiplier=args.width_multiplier, use_sk=args.use_sk,
+    #                           small_image_stem=args.small_image_stem,)
+    model = SimCLR(resnet_variant=args.model, width_multiplier=args.width_multiplier, use_sk=args.use_sk,
+        small_image_stem=args.small_image_stem, in_channels=3, projection_dim=128, projection_layers=2,
+        projection_hidden_dim=None, zero_init_residual=False)
+    model = wrap_model(model, runtime)
 
     if args.optimizer is None:
         optimizer_name = "lars"
