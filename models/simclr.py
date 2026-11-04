@@ -1,13 +1,13 @@
 import torch.nn as nn
 
-from resnet import SimCLRResNetEncoder
-from projection_head import ProjectionHead
+from models.resnet import SimCLRResNetEncoder
+from models.projection_head import ProjectionHead
 
 
 class SimCLR(nn.Module):
     def __init__(self, resnet_variant="resnet18", width_multiplier=1, use_sk=False,
         small_image_stem=False, in_channels=3, projection_dim=128, projection_layers=2,
-        projection_hidden_dim=None, zero_init_residual=False,):
+        projection_hidden_dim=512, zero_init_residual=False,):
         super().__init__()
 
         self.encoder = SimCLRResNetEncoder(resnet_variant=resnet_variant, width_multiplier=width_multiplier,
@@ -39,4 +39,3 @@ class SimCLR(nn.Module):
                 "use_sk": self.encoder.use_sk, "small_image_stem": self.encoder.small_image_stem,
                 "feature_dim": self.feature_dim, "projection_dim": self.projection_dim,
                 "projection_layers": self.projector.num_layers, "projection_hidden_dim": self.projector.hidden_dim}
-    
