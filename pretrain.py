@@ -59,7 +59,10 @@ def run_pretraining(args, runtime: Runtime):
     #     model = SimCLRModelV2(resnet_variant=args.model, projection_dim=proj_dim,
     #                           width_multiplier=args.width_multiplier, use_sk=args.use_sk,
     #                           small_image_stem=args.small_image_stem,)
-    model = SimCLR()
+    model = SimCLR(resnet_variant=args.model, width_multiplier=args.width_multiplier, use_sk=args.use_sk,
+                   small_image_stem=args.small_image_stem, in_channels=args.in_channels,
+                   projection_dim=args.projection_dim, projection_layers=args.projection_layers,
+                   projection_hidden_dim=args.projection_hidden_dim)
     model = wrap_model(model, runtime)
 
     if args.optimizer is None:
@@ -134,37 +137,37 @@ def run_pretraining(args, runtime: Runtime):
                  f"{args.experiment_name}_LR: warm-up + cosine decay",
                  str(plot_dir / f"{args.experiment_name}_lr.png"),
                  learning_rates, )
-        if args.ssl_type == "simclr":
-            torch.save(
-                {
-                    "model_state_dict": model_to_save.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "epochs": num_epochs,
-                    "global_step": global_step,
-                    "train_losses": train_losses,
-                    "model": args.model,
-                    "optimizer": optimizer_name,
-                    "projection_dim": proj_dim
-                },
-                checkpoint_path, )
-            torch.save(model_to_save.encoder.state_dict(), encoder_path)
-        elif args.ssl_type == "simclrv2":
-            torch.save(
-                {
-                    "model_state_dict": model_to_save.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "epochs": num_epochs,
-                    "global_step": global_step,
-                    "model_config": {
-                        "resnet_variant": args.model,
-                        "width_multiplier": args.width_multiplier,
-                        "use_sk": args.use_sk,
-                        "projection_dim": args.projection_dim,
-                        "small_image_stem": args.small_image_stem,
-                    },
-                },
-                checkpoint_path,
-            )
+        # if args.ssl_type == "simclr":
+        torch.save(
+            {
+                "model_state_dict": model_to_save.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "epochs": num_epochs,
+                "global_step": global_step,
+                "train_losses": train_losses,
+                "model": args.model,
+                "optimizer": optimizer_name,
+                "projection_dim": args.projection_dim
+            },
+            checkpoint_path, )
+        torch.save(model_to_save.encoder.state_dict(), encoder_path)
+        # elif args.ssl_type == "simclrv2":
+        #     torch.save(
+        #         {
+        #             "model_state_dict": model_to_save.state_dict(),
+        #             "optimizer_state_dict": optimizer.state_dict(),
+        #             "epochs": num_epochs,
+        #             "global_step": global_step,
+        #             "model_config": {
+        #                 "resnet_variant": args.model,
+        #                 "width_multiplier": args.width_multiplier,
+        #                 "use_sk": args.use_sk,
+        #                 "projection_dim": args.projection_dim,
+        #                 "small_image_stem": args.small_image_stem,
+        #             },
+        #         },
+        #         checkpoint_path,
+        #     )
 
         print(f"Checkpoint saved to: {checkpoint_path}")
         # print(f"Encoder saved to: {encoder_path}")

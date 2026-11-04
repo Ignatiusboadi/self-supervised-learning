@@ -58,6 +58,7 @@ def build_parser():
                         choices=["encoder", "projection_1", "projection_2", "projection"])
     parser.add_argument("--in-channels", type=int, default=3)
     parser.add_argument("--projection-hidden-dim", type=int, default=512)
+    parser.add_argument("--projection-layers", type=int, default=2)
 
     return parser
 
