@@ -145,9 +145,8 @@ def run_pretraining(args, runtime: Runtime):
                 "epochs": num_epochs,
                 "global_step": global_step,
                 "train_losses": train_losses,
-                "model": args.model,
                 "optimizer": optimizer_name,
-                "projection_dim": args.projection_dim
+                "config": model_to_save.get_config()
             },
             checkpoint_path, )
         torch.save(model_to_save.encoder.state_dict(), encoder_path)
