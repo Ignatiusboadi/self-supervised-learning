@@ -135,14 +135,14 @@ class SimCLRResNetEncoder(nn.Module):
             self.stem = nn.Sequential(
                 nn.Conv2d(in_channels, stem_channels, kernel_size=3, stride=1, padding=1, bias=False),
                 nn.BatchNorm2d(stem_channels),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
             )
             self.maxpool = nn.Identity()
         else:
             self.stem = nn.Sequential(
                 nn.Conv2d(in_channels, stem_channels, kernel_size=7, stride=2, padding=3, bias=False),
                 nn.BatchNorm2d(stem_channels),
-                nn.ReLU(inplace=True), )
+                nn.ReLU(), )
             self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(64 * width_multiplier, layers[0], stride=1)
