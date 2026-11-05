@@ -8,6 +8,7 @@ from utils.distributed import Runtime
 from utils.evaluation import evaluate_model
 from utils.plotting import plot_fig
 from data_pipeline.gpu_finetune_data import get_finetuning_loaders_gpu
+from models.classifier import SimCLRClassifier
 
 
 def run_finetuning(args, runtime: Runtime):
@@ -43,11 +44,10 @@ def run_finetuning(args, runtime: Runtime):
     optimizer_name = args.optimizer or "adamw"
     strategies = args.strategies or [args.strategy]
 
-    # config = {"resnet_variant": args.resnet_variant, "width_multiplier": args.width_multiplier,
-    #           "use_sk": args.use_sk, "small_image_stem": args.small_image_stem,
-    #           "feature_dim": args.feature_dim, "projection_dim": args.projection_dim,
-    #           "projection_layers": args.projector.num_layers,
-    #           "projection_hidden_dim": args.projector.hidden_dim}
+    config = {"resnet_variant": args.resnet_variant, "width_multiplier": args.width_multiplier,
+              "use_sk": args.use_sk, "small_image_stem": args.small_image_stem,
+              "projection_dim": args.projection_dim, "projection_layers": args.projector.num_layers,
+              "projection_hidden_dim": args.projector.hidden_dim}
 
     all_results = []
 
@@ -75,9 +75,11 @@ def run_finetuning(args, runtime: Runtime):
                 train_loader, val_loader, test_loader, classes = get_finetuning_loaders_gpu(
                     data_dir, device=device, batch_size=batch_size, data_fraction=fraction, img_size=args.image_size,
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
-                    val_fraction=0.3, val_cache_path=args.val_cache_path)
-
-            model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
+                    val_fraction=0.2, val_cache_path=args.val_cache_path)
+            if args.from_scratch:
+                model = SimCLRClassifier(num_classes=args.num_classes, **config)
+            else:
+                model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
 
             model, history = fit_finetuning(
                 model=model,
