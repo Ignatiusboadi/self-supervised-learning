@@ -24,18 +24,18 @@ def run_finetuning(args, runtime: Runtime):
     data_dir = Path(args.data_path or root / "data" / args.dataset)
 
     checkpoint_path = args.checkpoint
-    if checkpoint_path is None:
-        checkpoint_path = (
-                root / "outputs" / "checkpoints" / args.ssl_type
-                / f"{args.experiment_name}_checkpoint.pth"
-        )
+    # if checkpoint_path is None:
+    #     checkpoint_path = (
+    #             root / "outputs" / "checkpoints" / args.ssl_type
+    #             / f"{args.experiment_name}_checkpoint.pth"
+    #     )
 
     checkpoint_path = Path(checkpoint_path)
 
-    if not checkpoint_path.is_file():
-        raise FileNotFoundError(
-            f"Pretrained checkpoint not found: {checkpoint_path}"
-        )
+    # if not checkpoint_path.is_file():
+    #     raise FileNotFoundError(
+    #         f"Pretrained checkpoint not found: {checkpoint_path}"
+    #     )
 
     num_epochs = args.epochs if args.epochs is not None else 30
     batch_size = args.batch_size if args.batch_size is not None else 128
