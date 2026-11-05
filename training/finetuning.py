@@ -15,8 +15,6 @@ from models.classifier import SimCLRClassifier
 from pathlib import Path
 import torch
 
-from models.classifier import SimCLRClassifier
-
 
 def load_pretrained(checkpoint_path, num_classes=10, config=None):
     checkpoint_path = Path(checkpoint_path)
