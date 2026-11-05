@@ -77,7 +77,7 @@ def run_finetuning(args, runtime: Runtime):
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
                 )
 
-            model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes), config=config)
+            model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
 
             model, history = fit_finetuning(
                 model=model,
