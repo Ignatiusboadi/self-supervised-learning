@@ -112,8 +112,7 @@ def get_finetuning_loaders(
     data_fraction=1.0,
     val_fraction=0.2,
     seed=42,
-    num_workers=0,
-    val_dir=None,
+    num_workers=0
 ):
     data_dir = Path(data_dir)
 
@@ -132,12 +131,7 @@ def get_finetuning_loaders(
         transform=test_transform,
     )
 
-    if val_dir is not None:
-        val_path = Path(val_dir)
-        if not val_path.is_absolute():
-            val_path = data_dir / val_path
-    else:
-        val_path = data_dir / "val"
+    val_path = data_dir / "val"
 
     if val_path.is_dir():
         val_dataset = datasets.ImageFolder(
