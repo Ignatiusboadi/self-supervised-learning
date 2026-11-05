@@ -60,6 +60,8 @@ def build_parser():
     parser.add_argument("--in-channels", type=int, default=3)
     parser.add_argument("--projection-hidden-dim", type=int, default=512)
     parser.add_argument("--projection-layers", type=int, default=2)
+    parser.add_argument("--num-classes", type=int, default=10)
+    parser.add_argument("--from-scratch", action="store_true")
 
     return parser
 
