@@ -4,115 +4,75 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import models
 from tqdm.auto import tqdm
 
-from methods.simclr_v2 import SimCLRModelV2, SimCLRV2Classifier
 from utils.optimizer_factory import build_optimizer
 import torch.distributed as dist
 from sklearn.metrics import balanced_accuracy_score, f1_score
-
 from utils.optimizers import disable_bn_running_stats, enable_bn_running_stats
+from models.classifier import SimCLRClassifier
+
+from pathlib import Path
+import torch
+
+from models.classifier import SimCLRClassifier
 
 
-def load_pretrained(checkpoint_path, resnet_variant="resnet18", num_classes=10, ssl_type="simclr",
-                    feature_layer="encoder"):
+def load_pretrained(checkpoint_path, num_classes=10, config=None):
     checkpoint_path = Path(checkpoint_path)
-    if not checkpoint_path.exists():
-        raise FileNotFoundError(f"Encoder checkpoint not found: {checkpoint_path}")
+
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"Pretrained checkpoint not found: {checkpoint_path}")
 
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True, )
-    if ssl_type == "simclr":
-        if resnet_variant == "resnet18":
-            model = models.resnet18(weights=None)
-        elif resnet_variant == "resnet50":
-            model = models.resnet50(weights=None)
-        else:
-            raise ValueError(
-                f"Unsupported backbone: {resnet_variant}. "
-                "Choose 'resnet18' or 'resnet50'."
-            )
-        model.fc = nn.Identity()
-        model.load_state_dict(checkpoint)
-        feature_dim = model.fc.in_features if isinstance(model.fc, nn.Linear) else (
-            512 if resnet_variant == "resnet18" else 2048)
-        model.fc = nn.Linear(feature_dim, num_classes)
-    elif ssl_type == "simclrv2":
-        config = checkpoint.get("model_config", {})
-        backbone = SimCLRModelV2(**config)
-        state_dict = {key.removeprefix("module."): value for key, value in checkpoint["model_state_dict"].items()}
-        backbone.load_state_dict(state_dict, strict=True, )
+    if not config:
+        config = checkpoint["config"]
+    model = SimCLRClassifier(num_classes=num_classes, **config, )
+    full_state_dict = checkpoint["model_state_dict"]
 
-        model = SimCLRV2Classifier(backbone=backbone, num_classes=num_classes, feature_layer=feature_layer, )
+    encoder_state_dict = {key.removeprefix("encoder."): value for key, value in full_state_dict.items()
+                          if key.startswith("encoder.")}
+
+    if not encoder_state_dict:
+        raise ValueError("No encoder weights found in the checkpoint.")
+
+    model.encoder.load_state_dict(
+        encoder_state_dict,
+        strict=True,
+    )
+
+    print(f"Loaded pretrained encoder: {checkpoint_path}")
+    print(f"Architecture configuration: {config}")
+
     return model
 
 
-def configure_trainable_layers(model, strategy, feature_layer="encoder", unfreeze_backbone=False, ):
+def configure_trainable_layers(model, strategy, unfreeze_backbone=False, ):
     model = model.module if hasattr(model, "module") else model
+
     for parameter in model.parameters():
         parameter.requires_grad = False
+
     for parameter in model.fc.parameters():
         parameter.requires_grad = True
 
-    backbone = getattr(model, "backbone", None)
-
-    if backbone is None:
-        if strategy == "full":
-            for parameter in model.parameters():
-                parameter.requires_grad = True
-        elif strategy == "freeze_then_full" and unfreeze_backbone:
-            for parameter in model.parameters():
-                parameter.requires_grad = True
-        elif strategy == "partial":
-            for parameter in model.layer4.parameters():
-                parameter.requires_grad = True
-        return
-
-    encoder = backbone.encoder
-    projection_head = backbone.projection_head
-    if feature_layer == "encoder":
-        required_projection_parts = []
-    elif feature_layer == "projection_1":
-        required_projection_parts = ["fc1", "bn1"]
-    elif feature_layer == "projection_2":
-        required_projection_parts = ["fc1", "bn1", "fc2", "bn2"]
-
-    else:
-        required_projection_parts = ["fc1", "bn1", "fc2", "bn2", "fc3"]
-
-    for name, parameter in projection_head.named_parameters():
-        parameter.requires_grad = any(
-            name == part or name.startswith(part + ".") for part in required_projection_parts) and False
-
     if strategy == "full":
-        for parameter in encoder.parameters():
-            parameter.requires_grad = True
-        for name, parameter in projection_head.named_parameters():
-            if any(name == part or name.startswith(part + ".") for part in required_projection_parts):
-                parameter.requires_grad = True
-
-        for parameter in model.fc.parameters():
+        for parameter in model.encoder.parameters():
             parameter.requires_grad = True
 
     elif strategy == "freeze_then_full":
         if unfreeze_backbone:
-            for parameter in encoder.parameters():
+            for parameter in model.encoder.parameters():
                 parameter.requires_grad = True
-
-            for name, parameter in projection_head.named_parameters():
-                if any(name == part or name.startswith(part + ".") for part in required_projection_parts):
-                    parameter.requires_grad = True
 
     elif strategy == "partial":
-        if not hasattr(encoder, "layer4"):
-            raise ValueError("Partial fine-tuning requires an encoder with a layer4 stage.")
-
-        for parameter in encoder.layer4.parameters():
+        for parameter in model.encoder.layer4.parameters():
             parameter.requires_grad = True
 
-        for name, parameter in projection_head.named_parameters():
-            if any(name == part or name.startswith(part + ".") for part in required_projection_parts):
-                parameter.requires_grad = True
+    else:
+        raise ValueError(
+            f"Unsupported fine-tuning strategy: {strategy}"
+        )
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device, epoch,
@@ -174,7 +134,6 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch,
     return running_loss / total, 100.0 * correct / total
 
 
-
 @torch.no_grad()
 def evaluate_one_epoch(model, loader, criterion, device):
     model.eval()
@@ -207,13 +166,13 @@ def evaluate_one_epoch(model, loader, criterion, device):
     val_accuracy = (100.0 * sum(p == t for p, t in zip(all_predictions, all_targets)) / total_samples)
 
     balanced_acc = 100.0 * balanced_accuracy_score(all_targets, all_predictions)
-    macro_f1 = 100.0 * f1_score(all_targets, all_predictions, average="macro", zero_division=0,)
+    macro_f1 = 100.0 * f1_score(all_targets, all_predictions, average="macro", zero_division=0, )
     return val_loss, val_accuracy, balanced_acc, macro_f1
 
 
 def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_layer="encoder",
-    strategy="full", num_epochs=30, freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4,
-    opt_name="sgd", patience=10, min_delta=1e-3, ):
+                   strategy="full", num_epochs=30, freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4,
+                   opt_name="sgd", patience=10, min_delta=1e-3, ):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -225,7 +184,7 @@ def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_
     base_model = model.module if hasattr(model, "module") else model
     criterion = nn.CrossEntropyLoss()
     optimizer = build_optimizer(opt_name, parameters=model.parameters(), learning_rate=learning_rate,
-        weight_decay=weight_decay, )
+                                weight_decay=weight_decay, )
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, )
 
@@ -239,7 +198,6 @@ def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_
         "learning_rate": [],
     }
 
-    # best_val_loss = float("inf")
     best_val_macro_f1 = -float("inf")
     best_state = None
     best_epoch = -1
