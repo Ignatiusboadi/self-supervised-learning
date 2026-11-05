@@ -87,7 +87,7 @@ def main():
 
     try:
         runtime.print(f"Mode: {args.mode}")
-        runtime.print(f"Backbone: {args.model}")
+        runtime.print(f"Backbone: {args.resnet_variant}")
         runtime.print(f"Device: {runtime.device}")
         runtime.print(f"Distributed: {runtime.distributed}, World size: {runtime.world_size}")
 
