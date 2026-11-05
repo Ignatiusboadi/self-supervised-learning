@@ -21,6 +21,7 @@ def build_parser():
         help="Root directory for checkpoints, plots, and results", )
     parser.add_argument("--train-cache-path", type=str, default=None,
                         help="path for uint train cache", )
+    parser.add_argument("--val-cache-path", type=str, default=None, help="path for uint val cache", )
     parser.add_argument("--test-cache-path", type=str, default=None,
                         help="path for uint test cache", )
     parser.add_argument("--root-dir", type=str, default=".")
