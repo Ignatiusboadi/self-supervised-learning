@@ -10,8 +10,8 @@ def build_parser():
     parser.add_argument("--experiment-name", type=str, default=None)
     parser.add_argument("--mode", choices=["pretrain", "finetune"], required=True,
         help="Training workflow to execute", )
-    parser.add_argument("--model", choices=["resnet18", "resnet50"], default="resnet18",
-        help="Backbone architecture", )
+    parser.add_argument("--resnet-variant", choices=["resnet18", "resnet34", "resnet50", ],
+                        default="resnet18", help="Backbone architecture", )
     parser.add_argument("--dataset", type=str, default="cifar10", help="Dataset name", )
     parser.add_argument("--data-path", type=str, default=None,
                         help="Dataset directory; defaults depend on the mode", )

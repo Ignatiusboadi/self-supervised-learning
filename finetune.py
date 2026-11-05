@@ -114,7 +114,7 @@ def run_finetuning(args, runtime: Runtime):
 
             results = {
                 "mode": "finetune",
-                "model": args.model,
+                "model": args.resnet_variant,
                 "dataset": args.dataset,
                 "checkpoint": str(checkpoint_path),
                 "strategy": strategy,
