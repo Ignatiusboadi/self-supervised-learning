@@ -20,19 +20,19 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
-def _read(path, size):
+def _read(path, img_size):
     with Image.open(path) as im:
         im = im.convert("RGB")
-        if size is not None:
-            im = im.resize((size, size), Image.BILINEAR)
+        if img_size is not None:
+            im = im.resize((img_size, img_size), Image.BILINEAR)
         return np.asarray(im)
 
 
-def build_split_cache(split_dir, cache_path, size=None, num_threads=32):
+def build_split_cache(split_dir, cache_path, img_size=None, num_threads=32):
     ds = ImageFolder(str(split_dir))
     paths = [p for p, _ in ds.samples]
     with ThreadPoolExecutor(num_threads) as ex:
-        arrays = list(tqdm(ex.map(lambda p: _read(p, size), paths), total=len(paths),
+        arrays = list(tqdm(ex.map(lambda p: _read(p, img_size), paths), total=len(paths),
                            desc=f"Caching {Path(split_dir).name}"))
     payload = {
         "data": torch.from_numpy(np.stack(arrays)).permute(0, 3, 1, 2).contiguous(),
@@ -73,8 +73,6 @@ def get_stratified_subset_indices(targets, fraction=0.5, seed=42):
 
 
 class GPUFinetuneTransform(nn.Module):
-    """uint8 (B,3,H,W) -> normalized float. Train: + random horizontal flip."""
-
     def __init__(self, train, mean=CIFAR10_MEAN, std=CIFAR10_STD):
         super().__init__()
         self.train_mode = train
@@ -157,10 +155,16 @@ def get_stratified_split_indices(targets, val_fraction=0.1, seed=42):
 
 def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, img_size=None, data_fraction=1.0,
                                val_fraction=0.1, seed=42, train_cache_path=".",
-                               test_cache_path:str=".", size=None):
+                               test_cache_path=".", val_cache_path=None):
     train_cache_path, test_cache_path = Path(train_cache_path), Path(test_cache_path)
+    val_cache_path = Path(val_cache_path) if val_cache_path is not None else None
+
     if data_dir is None:
-        missing = [p for p in (train_cache_path, test_cache_path) if not p.exists()]
+        required = [train_cache_path, test_cache_path]
+        if val_cache_path is not None:
+            required.append(val_cache_path)
+
+        missing = [p for p in required if not p.exists()]
         if missing:
             raise FileNotFoundError(f"Cache file(s) not found: {missing}. "
                                     f"Pass data_dir so they can be built.")
@@ -169,28 +173,50 @@ def get_finetuning_loaders_gpu(data_dir, device, batch_size=128, img_size=None, 
 
     for p in (train_cache_path, test_cache_path):
         p.parent.mkdir(parents=True, exist_ok=True)
+    if val_cache_path is not None:
+        val_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
-    train = load_split(data_dir / "train" if data_dir else None, train_cache_path, size)
-    test = load_split(data_dir / "test" if data_dir else None, test_cache_path, size)
+    train = load_split(data_dir / "train" if data_dir else None, train_cache_path, img_size)
+    test = load_split(data_dir / "test" if data_dir else None, test_cache_path, img_size)
 
-    if train["classes"] != test["classes"]:
-        raise ValueError("Training and test class mappings differ.")
+    val_dir = data_dir / "val" if data_dir else None
+    has_val = val_dir is not None and val_dir.is_dir()
+
+    if has_val:
+        if val_cache_path is None:
+            raise ValueError("val_cache_path must be provided when using an existing validation directory.")
+
+        val = load_split(val_dir, val_cache_path, img_size)
+
+        if train["classes"] != val["classes"] or train["classes"] != test["classes"]:
+            raise ValueError("Training, validation, and test class mappings differ.")
+
+    else:
+        if train["classes"] != test["classes"]:
+            raise ValueError("Training and test class mappings differ.")
 
     data, labels = train["data"], train["labels"]
     val_loader = None
-    if val_fraction > 0:
+
+    if has_val:
+        val_data, val_labels = val["data"], val["labels"]
+    elif val_fraction > 0:
         tr, va = get_stratified_split_indices(labels.tolist(), val_fraction, seed)
         tr, va = torch.tensor(tr), torch.tensor(va)
         val_data, val_labels = data[va], labels[va]
         data, labels = data[tr], labels[tr]
+
     if data_fraction < 1.0:
         idx = torch.tensor(get_stratified_subset_indices(labels.tolist(), data_fraction, seed))
         data, labels = data[idx], labels[idx]
 
     train_loader = GPULabeledLoader(data, labels, batch_size, device, train=True, seed=seed)
-    if val_fraction > 0:
-        val_loader = GPULabeledLoader(val_data, val_labels, batch_size, device, train=False, shard=False)
+
+    if has_val or val_fraction > 0:
+        val_loader = GPULabeledLoader(val_data, val_labels, batch_size, device,
+                                      train=False, shard=False)
 
     test_loader = GPULabeledLoader(test["data"], test["labels"], batch_size, device,
                                    train=False, shard=False)
+
     return train_loader, val_loader, test_loader, train["classes"]
