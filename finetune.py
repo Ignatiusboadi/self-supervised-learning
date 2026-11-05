@@ -67,7 +67,7 @@ def run_finetuning(args, runtime: Runtime):
                     img_size=args.image_size,
                     batch_size=batch_size,
                     data_fraction=fraction,
-                    val_fraction=0.1,
+                    val_fraction=0.3,
                     seed=args.seed,
                     num_workers=args.num_workers,
                 )
@@ -75,7 +75,7 @@ def run_finetuning(args, runtime: Runtime):
                 train_loader, val_loader, test_loader, classes = get_finetuning_loaders_gpu(
                     data_dir, device=device, batch_size=batch_size, data_fraction=fraction, img_size=args.image_size,
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
-                )
+                    val_fraction=0.3, val_cache_path=args.val_cache_path)
 
             model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
 
