@@ -25,8 +25,8 @@ def run_finetuning(args, runtime: Runtime):
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
         checkpoint_path = (
-            root / "outputs" / "checkpoints" / args.ssl_type
-            / f"{args.experiment_name}_encoder.pth"
+                root / "outputs" / "checkpoints" / args.ssl_type
+                / f"{args.experiment_name}_checkpoint.pth"
         )
 
     checkpoint_path = Path(checkpoint_path)
@@ -42,6 +42,12 @@ def run_finetuning(args, runtime: Runtime):
     weight_decay = args.weight_decay if args.weight_decay is not None else 5e-4
     optimizer_name = args.optimizer or "adamw"
     strategies = args.strategies or [args.strategy]
+
+    # config = {"resnet_variant": args.resnet_variant, "width_multiplier": args.width_multiplier,
+    #           "use_sk": args.use_sk, "small_image_stem": args.small_image_stem,
+    #           "feature_dim": args.feature_dim, "projection_dim": args.projection_dim,
+    #           "projection_layers": args.projector.num_layers,
+    #           "projection_hidden_dim": args.projector.hidden_dim}
 
     all_results = []
 
@@ -71,13 +77,7 @@ def run_finetuning(args, runtime: Runtime):
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
                 )
 
-            model = load_pretrained(
-                checkpoint_path=str(checkpoint_path),
-                resnet_variant=args.model,
-                num_classes=len(classes),
-                ssl_type=args.ssl_type,
-                feature_layer=args.feature_layer,
-            )
+            model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
 
             model, history = fit_finetuning(
                 model=model,
