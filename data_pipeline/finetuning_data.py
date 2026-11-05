@@ -103,27 +103,28 @@ def get_stratified_split_indices(targets, val_fraction=0.1, seed=42):
     return train_indices, val_indices
 
 
+
 def get_finetuning_loaders(
     data_dir,
     dataset_name="cifar10",
     img_size=None,
     batch_size=128,
     data_fraction=1.0,
-    val_fraction=0.1,
+    val_fraction=0.2,
     seed=42,
     num_workers=0,
+    val_dir=None,
 ):
     data_dir = Path(data_dir)
-    train_transform, test_transform = get_finetuning_transforms(dataset=dataset_name, img_size=img_size)
+
+    train_transform, test_transform = get_finetuning_transforms(
+        dataset=dataset_name,
+        img_size=img_size,
+    )
 
     train_dataset = datasets.ImageFolder(
         root=str(data_dir / "train"),
         transform=train_transform,
-    )
-
-    val_dataset = datasets.ImageFolder(
-        root=str(data_dir / "train"),
-        transform=test_transform,
     )
 
     test_dataset = datasets.ImageFolder(
@@ -131,32 +132,56 @@ def get_finetuning_loaders(
         transform=test_transform,
     )
 
-    if (
-        train_dataset.class_to_idx != val_dataset.class_to_idx
-        or train_dataset.class_to_idx != test_dataset.class_to_idx
-    ):
-        raise ValueError("Training, validation, and test class mappings differ.")
+    if val_dir is not None:
+        val_path = Path(val_dir)
+        if not val_path.is_absolute():
+            val_path = data_dir / val_path
+    else:
+        val_path = data_dir / "val"
 
-    train_indices, val_indices = get_stratified_split_indices(
-        train_dataset.targets,
-        val_fraction=val_fraction,
-        seed=seed,
-    )
+    if val_path.is_dir():
+        val_dataset = datasets.ImageFolder(
+            root=str(val_path),
+            transform=test_transform,
+        )
+
+        if (
+            train_dataset.class_to_idx != val_dataset.class_to_idx
+            or train_dataset.class_to_idx != test_dataset.class_to_idx
+        ):
+            raise ValueError(
+                "Training, validation, and test class mappings differ."
+            )
+        train_indices = list(range(len(train_dataset)))
+        val_subset = val_dataset
+    else:
+        val_dataset = datasets.ImageFolder(
+            root=str(data_dir / "train"),
+            transform=test_transform,
+        )
+        if train_dataset.class_to_idx != test_dataset.class_to_idx:
+            raise ValueError(
+                "Training and test class mappings differ."
+            )
+        train_indices, val_indices = get_stratified_split_indices(
+            train_dataset.targets,
+            val_fraction=val_fraction,
+            seed=seed,
+        )
+        val_subset = Subset(val_dataset, val_indices)
 
     train_targets = [train_dataset.targets[i] for i in train_indices]
+
     relative_indices = get_stratified_subset_indices(
         train_targets,
         fraction=data_fraction,
         seed=seed,
     )
+
     train_indices = [train_indices[i] for i in relative_indices]
-
     train_subset = Subset(train_dataset, train_indices)
-    val_subset = Subset(val_dataset, val_indices)
-
-    loader_generator = torch.Generator().manual_seed(seed)
     pin_memory = torch.cuda.is_available()
-
+    loader_generator = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(
         train_subset,
         batch_size=batch_size,
@@ -185,3 +210,4 @@ def get_finetuning_loaders(
     classes = train_dataset.classes
 
     return train_loader, val_loader, test_loader, classes
+
