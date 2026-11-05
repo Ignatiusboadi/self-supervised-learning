@@ -46,8 +46,8 @@ def run_finetuning(args, runtime: Runtime):
 
     config = {"resnet_variant": args.resnet_variant, "width_multiplier": args.width_multiplier,
               "use_sk": args.use_sk, "small_image_stem": args.small_image_stem,
-              "projection_dim": args.projection_dim, "projection_layers": args.projector.num_layers,
-              "projection_hidden_dim": args.projector.hidden_dim}
+              "projection_dim": args.projection_dim, "projection_layers": args.projection_layers,
+              "projection_hidden_dim": args.projection_hidden_dim}
 
     all_results = []
 
