@@ -27,6 +27,7 @@ def load_pretrained(checkpoint_path, num_classes=10, config=None):
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True, )
     if not config:
         config = checkpoint["config"]
+    config = {k: v for k, v in config.items() if k != "feature_dim"}
     model = SimCLRClassifier(num_classes=num_classes, **config, )
     full_state_dict = checkpoint["model_state_dict"]
 
