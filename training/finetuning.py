@@ -69,10 +69,10 @@ def configure_trainable_layers(model, strategy, unfreeze_backbone=False, ):
         for parameter in model.encoder.layer4.parameters():
             parameter.requires_grad = True
 
-    else:
-        raise ValueError(
-            f"Unsupported fine-tuning strategy: {strategy}"
-        )
+    # else:
+    #     raise ValueError(
+    #         f"Unsupported fine-tuning strategy: {strategy}"
+    #     )
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device, epoch,
@@ -212,7 +212,6 @@ def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_
             model,
             strategy,
             unfreeze_backbone=unfreeze_backbone,
-            feature_layer=feature_layer,
         )
 
         train_loss, train_accuracy = train_one_epoch(
