@@ -41,7 +41,13 @@ def cache_imagefolder(split_dir, cache_path, size=None, labeled=True, num_thread
 #                   "cifar10_train_imb100_u8.pt", labeled=True, overwrite=True)
 # cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\cifar10\test",
 #                   "cifar10_test_u8.pt", labeled=False, overwrite=True)
-cache_imagefolder(r"/Users/ignatiusboadi/Documents/Pycharm_Projects/self_supervised_learning/data/cifar10/train",
-                  "cifar10_finetune_train_u8.pt", labeled=True, overwrite=True)
-cache_imagefolder(r"/Users/ignatiusboadi/Documents/Pycharm_Projects/self_supervised_learning/data/cifar10/test",
-                  "cifar10_finetune_test_u8.pt", labeled=True, overwrite=True)
+# cache_imagefolder(r"/Users/ignatiusboadi/Documents/Pycharm_Projects/self_supervised_learning/data/cifar10/train",
+#                   "cifar10_finetune_train_u8.pt", labeled=True, overwrite=True)
+# cache_imagefolder(r"/Users/ignatiusboadi/Documents/Pycharm_Projects/self_supervised_learning/data/cifar10/test",
+#                   "cifar10_finetune_test_u8.pt", labeled=True, overwrite=True)
+cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\train_noise_20",
+                  "cifar10_20noisetrain_u8.pt", labeled=True, overwrite=True)
+cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\train_noise_70",
+                  "cifar10_70noisetrain_u8.pt", labeled=True, overwrite=True)
+cache_imagefolder(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\val",
+                  "cifar10_val_u8.pt", labeled=True, overwrite=True)
