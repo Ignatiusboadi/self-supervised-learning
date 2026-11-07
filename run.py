@@ -8,7 +8,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Self-supervised pretraining and downstream fine-tuning")
 
     parser.add_argument("--experiment-name", type=str, default=None)
-    parser.add_argument("--mode", choices=["pretrain", "finetune"], required=True,
+    parser.add_argument("--mode", choices=["pretrain", "finetune", "csr"], required=True,
         help="Training workflow to execute", )
     parser.add_argument("--resnet-variant", choices=["resnet18", "resnet34", "resnet50", ],
                         default="resnet18", help="Backbone architecture", )
@@ -63,6 +63,16 @@ def build_parser():
     parser.add_argument("--num-classes", type=int, default=10)
     parser.add_argument("--from-scratch", action="store_true")
 
+    parser.add_argument("--csr-hidden-dim", type=int, default=None)
+    parser.add_argument("--csr-topk", type=int, default=32)
+    parser.add_argument("--csr-gamma", type=float, default=1.0)
+    parser.add_argument("--csr-auxk", type=int, default=512)
+    parser.add_argument("--csr-beta", type=float, default=1 / 32)
+    parser.add_argument("--csr-epochs", type=int, default=10)
+    parser.add_argument("--csr-learning-rate", type=float, default=4e-5)
+    parser.add_argument("--classifier-epochs", type=int, default=30)
+    parser.add_argument("--classifier-learning-rate", type=float, default=1e-3)
+
     return parser
 
 
@@ -97,9 +107,14 @@ def main():
         if args.mode == "pretrain":
             from pretrain import run_pretraining
             run_pretraining(args, runtime)
-        else:
+
+        elif args.mode == "finetune":
             from finetune import run_finetuning
             run_finetuning(args, runtime)
+
+        else:
+            from csr_pipeline import run_csr
+            run_csr(args, runtime)
 
     finally:
         cleanup_runtime(runtime)
