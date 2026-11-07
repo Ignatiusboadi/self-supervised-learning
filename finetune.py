@@ -8,6 +8,7 @@ from utils.distributed import Runtime
 from utils.evaluation import evaluate_model
 from utils.plotting import plot_fig
 from data_pipeline.gpu_finetune_data import get_finetuning_loaders_gpu
+from models.classifier import SimCLRClassifier
 
 
 def run_finetuning(args, runtime: Runtime):
@@ -23,18 +24,18 @@ def run_finetuning(args, runtime: Runtime):
     data_dir = Path(args.data_path or root / "data" / args.dataset)
 
     checkpoint_path = args.checkpoint
-    if checkpoint_path is None:
-        checkpoint_path = (
-            root / "outputs" / "checkpoints" / args.ssl_type
-            / f"{args.experiment_name}_encoder.pth"
-        )
+    # if checkpoint_path is None:
+    #     checkpoint_path = (
+    #             root / "outputs" / "checkpoints" / args.ssl_type
+    #             / f"{args.experiment_name}_checkpoint.pth"
+    #     )
 
     checkpoint_path = Path(checkpoint_path)
 
-    if not checkpoint_path.is_file():
-        raise FileNotFoundError(
-            f"Pretrained checkpoint not found: {checkpoint_path}"
-        )
+    # if not checkpoint_path.is_file():
+    #     raise FileNotFoundError(
+    #         f"Pretrained checkpoint not found: {checkpoint_path}"
+    #     )
 
     num_epochs = args.epochs if args.epochs is not None else 30
     batch_size = args.batch_size if args.batch_size is not None else 128
@@ -42,6 +43,11 @@ def run_finetuning(args, runtime: Runtime):
     weight_decay = args.weight_decay if args.weight_decay is not None else 5e-4
     optimizer_name = args.optimizer or "adamw"
     strategies = args.strategies or [args.strategy]
+
+    config = {"resnet_variant": args.resnet_variant, "width_multiplier": args.width_multiplier,
+              "use_sk": args.use_sk, "small_image_stem": args.small_image_stem,
+              "projection_dim": args.projection_dim, "projection_layers": args.projection_layers,
+              "projection_hidden_dim": args.projection_hidden_dim}
 
     all_results = []
 
@@ -61,7 +67,7 @@ def run_finetuning(args, runtime: Runtime):
                     img_size=args.image_size,
                     batch_size=batch_size,
                     data_fraction=fraction,
-                    val_fraction=0.1,
+                    val_fraction=0.3,
                     seed=args.seed,
                     num_workers=args.num_workers,
                 )
@@ -69,15 +75,11 @@ def run_finetuning(args, runtime: Runtime):
                 train_loader, val_loader, test_loader, classes = get_finetuning_loaders_gpu(
                     data_dir, device=device, batch_size=batch_size, data_fraction=fraction, img_size=args.image_size,
                     seed=42, train_cache_path=args.train_cache_path, test_cache_path=args.test_cache_path,
-                )
-
-            model = load_pretrained(
-                checkpoint_path=str(checkpoint_path),
-                resnet_variant=args.model,
-                num_classes=len(classes),
-                ssl_type=args.ssl_type,
-                feature_layer=args.feature_layer,
-            )
+                    val_fraction=0.2, val_cache_path=args.val_cache_path)
+            if args.from_scratch:
+                model = SimCLRClassifier(num_classes=args.num_classes, **config)
+            else:
+                model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
 
             model, history = fit_finetuning(
                 model=model,
@@ -112,7 +114,7 @@ def run_finetuning(args, runtime: Runtime):
 
             results = {
                 "mode": "finetune",
-                "model": args.model,
+                "model": args.resnet_variant,
                 "dataset": args.dataset,
                 "checkpoint": str(checkpoint_path),
                 "strategy": strategy,
@@ -146,6 +148,10 @@ def run_finetuning(args, runtime: Runtime):
             "data_fraction": result["data_fraction"],
             "test_loss": result["metrics"]["test_loss"],
             "test_accuracy": result["metrics"]["test_accuracy"],
+            "test_balanced_accuracy": result["metrics"]["balanced_accuracy"],
+            "test_macro_f1": result["metrics"]["macro_f1"],
+            "confusion_matrix": result["metrics"]["confusion_matrix"],
+            "metrics": result["metrics"],
         }
         for result in all_results
     ]
