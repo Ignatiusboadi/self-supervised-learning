@@ -10,7 +10,9 @@ def build_parser():
     parser.add_argument("--experiment-name", type=str, default=None)
     parser.add_argument("--mode", choices=["pretrain", "finetune", "csr"], required=True,
         help="Training workflow to execute", )
-    parser.add_argument("--resnet-variant", choices=["resnet18", "resnet34", "resnet50", ],
+    parser.add_argument("--ssl-type", default="simclr", choices=["simclr", "simclrv2"])
+    parser.add_argument("--resnet-variant",
+                        choices=["resnet18", "resnet34", "resnet50", "resnet101", "resnet134"],
                         default="resnet18", help="Backbone architecture", )
     parser.add_argument("--dataset", type=str, default="cifar10", help="Dataset name", )
     parser.add_argument("--data-path", type=str, default=None,
@@ -22,9 +24,7 @@ def build_parser():
     parser.add_argument("--train-cache-path", type=str, default=None,
                         help="path for uint train cache", )
     parser.add_argument("--val-cache-path", type=str, default=None, help="path for uint val cache", )
-    parser.add_argument("--test-cache-path", type=str, default=None,
-                        help="path for uint test cache", )
-    parser.add_argument("--root-dir", type=str, default=".")
+    parser.add_argument("--test-cache-path", type=str, default=None, help="path for uint test cache", )
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--learning-rate", type=float, default=None)
@@ -41,15 +41,12 @@ def build_parser():
     parser.add_argument("--patience", type=int, default=10)
     parser.add_argument("--checkpoint", type=str, default=None,
         help="Path to the pretrained encoder or model checkpoint", )
-    parser.add_argument("--strategy", choices=["full", "freeze_then_full", "linear_probe", "partial"],
-        default="full", )
     parser.add_argument("--freeze-epochs", type=int, default=10)
     parser.add_argument("--data-fraction", type=float, nargs="+", default=[1.0],
         help="One or more training fractions, e.g. 1.0 0.5", )
     parser.add_argument("--strategies", nargs="+",
                         choices=["full", "freeze_then_full", "linear_probe", "partial"], default=None,
-                        help="Run multiple fine-tuning strategies", )
-    parser.add_argument("--ssl-type", default="simclr", choices=["simclr", "simclrv2"])
+                        help="Run one or multiple fine-tuning strategy(ies)", )
     parser.add_argument("--width-multiplier", type=int, default=1)
     parser.add_argument("--use-sk", action="store_true", )
     parser.add_argument("--small-image-stem", action="store_true", )

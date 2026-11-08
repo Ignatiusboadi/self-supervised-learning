@@ -23,12 +23,12 @@ def run_pretraining(args, runtime: Runtime):
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     plot_dir.mkdir(parents=True, exist_ok=True)
 
-    num_epochs = args.epochs if args.epochs is not None else 100
-    batch_size = args.batch_size if args.batch_size is not None else 512
+    num_epochs = args.epochs if args.epochs else 100
+    batch_size = args.batch_size if args.batch_size else 512
     weight_decay = (args.weight_decay if args.weight_decay is not None else 1e-6)
     momentum = args.momentum
     global_batch_size = batch_size * runtime.world_size
-    base_lr = args.learning_rate if args.learning_rate is not None else 0.3 * global_batch_size / 256
+    base_lr = args.learning_rate if args.learning_rate else 0.3 * global_batch_size / 256
 
     device = runtime.device
     torch.manual_seed(args.seed)
@@ -36,7 +36,7 @@ def run_pretraining(args, runtime: Runtime):
         torch.cuda.manual_seed_all(args.seed)
 
     if args.train_cache_path is None:
-        data_path = args.data_path or f"{args.root_dir}/data/{args.data}/train"
+        data_path = args.data_path
         base_dataset = ImageFolder(root=data_path, transform=None, )
         dataset = SimCLRDataset(base_dataset, simclr_train_transforms(), )
         sampler = (DistributedSampler(dataset, num_replicas=runtime.world_size, rank=runtime.rank,
