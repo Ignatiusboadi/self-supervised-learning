@@ -134,15 +134,12 @@ class SimCLRResNetEncoder(nn.Module):
         if small_image_stem:
             self.stem = nn.Sequential(
                 nn.Conv2d(in_channels, stem_channels, kernel_size=3, stride=1, padding=1, bias=False),
-                nn.BatchNorm2d(stem_channels),
-                nn.ReLU(),
-            )
+                nn.BatchNorm2d(stem_channels), nn.ReLU(), )
             self.maxpool = nn.Identity()
         else:
             self.stem = nn.Sequential(
                 nn.Conv2d(in_channels, stem_channels, kernel_size=7, stride=2, padding=3, bias=False),
-                nn.BatchNorm2d(stem_channels),
-                nn.ReLU(), )
+                nn.BatchNorm2d(stem_channels), nn.ReLU(), )
             self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(64 * width_multiplier, layers[0], stride=1)
@@ -156,7 +153,6 @@ class SimCLRResNetEncoder(nn.Module):
     def _make_layer(self, planes, blocks, stride):
         layers = [self.block(self.in_channels, planes, stride=stride, use_sk=self.use_sk)]
         self.in_channels = planes * self.block.expansion
-
         for _ in range(1, blocks):
             layers.append(self.block(self.in_channels, planes, stride=1, use_sk=self.use_sk))
 
