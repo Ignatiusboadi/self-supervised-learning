@@ -2,22 +2,23 @@ import os
 import random
 import shutil
 from pathlib import Path
+from dotenv import load_dotenv
 
-SOURCE_DIR = Path(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\cifar10\train")
-OUTPUT_DIR = Path(r"C:\Users\iboad\PycharmProjects\self-supervised-learning\data\imb_cifar")
+load_dotenv()
+BASE_DIR = os.getenv("BASE_DIR")
+BASE_DIR = Path(BASE_DIR)
+SOURCE_DIR = BASE_DIR / Path(r"data/cifar10/train")
+OUTPUT_DIR = BASE_DIR / Path(r"data/imb_cifar")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 CLASS_NAMES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck", ]
 NUM_CLASSES = len(CLASS_NAMES)
 MAX_IMAGES_PER_CLASS = 5000
-
 IMBALANCE_RATIOS = [10, 50, 100]
-
 SEED = 42
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
 def create_imbalanced_dataset(source_dir: Path, imbalance_ratio: int, output_dir, seed: int = 42, ):
     rng = random.Random(seed)
-
     samples_per_class = [round(MAX_IMAGES_PER_CLASS * (1 / imbalance_ratio) ** (i / (NUM_CLASSES - 1)))
         for i in range(NUM_CLASSES)]
 
@@ -49,17 +50,11 @@ def create_imbalanced_dataset(source_dir: Path, imbalance_ratio: int, output_dir
             shutil.copy2(image_path, target_class_dir / image_path.name, )
 
         print(f"{class_name:12s}: {len(selected_images):5d} images")
-
     print(f"Finished: {dataset_dir}")
 
 
 if __name__ == "__main__":
     for ratio in IMBALANCE_RATIOS:
-        create_imbalanced_dataset(
-            source_dir=SOURCE_DIR,
-            output_dir=OUTPUT_DIR,
-            imbalance_ratio=ratio,
-            seed=SEED,
-        )
+        create_imbalanced_dataset(source_dir=SOURCE_DIR, output_dir=OUTPUT_DIR, imbalance_ratio=ratio, seed=SEED,)
 
     print("\nAll imbalanced datasets created successfully.")
