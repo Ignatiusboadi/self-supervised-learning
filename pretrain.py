@@ -10,8 +10,6 @@ from utils.distributed import Runtime, setup_runtime, wrap_model
 from utils.optimizers import LARS, SAM
 from utils.plotting import plot_fig
 from training.train import train_one_epoch
-from methods.simclr import SimCLRModel
-from methods.simclr_v2 import SimCLRModelV2
 from models.simclr import SimCLR
 
 
@@ -50,15 +48,6 @@ def run_pretraining(args, runtime: Runtime):
         loader, cache = get_simclr_pretraining_loader(data_dir=args.data_path, cache_path=cache_path, device=device,
                                                       batch_size=args.batch_size, img_size=args.image_size, )
 
-    # if args.ssl_type.lower() == "simclr":
-    #     proj_dim = args.projection_dim if args.projection_dim else 128
-    #     model = SimCLRModel(resnet_variant=args.model, projection_dim=proj_dim)  #  .to(device)
-    #     model = wrap_model(model, runtime)
-    # elif args.ssl_type.lower() == "simclrv2":
-    #     proj_dim = args.projection_dim if args.projection_dim else 128
-    #     model = SimCLRModelV2(resnet_variant=args.model, projection_dim=proj_dim,
-    #                           width_multiplier=args.width_multiplier, use_sk=args.use_sk,
-    #                           small_image_stem=args.small_image_stem,)
     model = SimCLR(resnet_variant=args.resnet_variant, width_multiplier=args.width_multiplier, use_sk=args.use_sk,
                    small_image_stem=args.small_image_stem, in_channels=args.in_channels,
                    projection_dim=args.projection_dim, projection_layers=args.projection_layers,
@@ -74,8 +63,8 @@ def run_pretraining(args, runtime: Runtime):
         optimizer = LARS(model.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay,
                          eta=args.eta, weight_decay_filter=True, lars_adaptation_filter=True, )
     elif optimizer_name == "sam":
-        optimizer = SAM(model.parameters(), torch.optim.SGD, lr=base_lr, momentum=momentum, weight_decay=weight_decay,
-                        rho=args.sam_rho, )
+        optimizer = SAM(model.parameters(), base_optimizer=torch.optim.SGD, lr=base_lr, momentum=momentum,
+                        weight_decay=weight_decay, rho=args.sam_rho, )
     elif optimizer_name == "sgd":
         optimizer = torch.optim.SGD(model.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay, )
     elif optimizer_name == "adam":
@@ -87,8 +76,8 @@ def run_pretraining(args, runtime: Runtime):
 
     steps_per_epoch = len(loader)
     if steps_per_epoch == 0:
-        raise ValueError("The DataLoader has no batches. Reduce the batch size "
-                         "or check the dataset and drop_last setting.")
+        raise ValueError(
+            "The DataLoader has no batches. Reduce the batch size or check the dataset and drop_last setting.")
 
     total_steps = num_epochs * steps_per_epoch
     warmup_steps = min(int(num_epochs * args.warmup_epochs) * steps_per_epoch, total_steps - 1, )
@@ -102,20 +91,11 @@ def run_pretraining(args, runtime: Runtime):
             loader.sampler.set_epoch(epoch)
         elif sampler is not None:
             sampler.set_epoch(epoch)
+
         epoch_loss, epoch_lrs, global_step = train_one_epoch(
-            model=model,
-            train_loader=loader,
-            optimizer=optimizer,
-            device=runtime.device,
-            global_step=global_step,
-            total_steps=total_steps,
-            warmup_steps=warmup_steps,
-            peak_lr=base_lr,
-            epoch=epoch,
-            num_epochs=num_epochs,
-            temperature=args.temperature,
-            optimizer_name=optimizer_name
-        )
+            model=model, train_loader=loader, optimizer=optimizer, device=runtime.device, global_step=global_step,
+            total_steps=total_steps, warmup_steps=warmup_steps, peak_lr=base_lr, epoch=epoch, num_epochs=num_epochs,
+            temperature=args.temperature, optimizer_name=optimizer_name)
 
         if runtime.distributed:
             loss_tensor = torch.tensor(epoch_loss, device=runtime.device, dtype=torch.float64)
@@ -124,20 +104,19 @@ def run_pretraining(args, runtime: Runtime):
         if runtime.is_main:
             train_losses.append(epoch_loss)
             learning_rates.append(epoch_lrs)
-
             print(f"Epoch [{epoch + 1}/{num_epochs}] Loss: {epoch_loss:.4f} LR: {epoch_lrs[-1]:.6f}")
+
     if runtime.is_main:
         checkpoint_path = (checkpoint_dir / f"{args.experiment_name}_checkpoint.pth")
         encoder_path = (checkpoint_dir / f"{args.experiment_name}_encoder.pth")
         model_to_save = model.module if runtime.distributed else model
 
-        plot_fig("Epoch", "Mean NT-Xent Loss", f"{args.experiment_name}_SimCLR Training Loss",
-                 str(plot_dir / f"{args.experiment_name}_loss.png"), train_losses, )
-        plot_fig("Training step", "Learning rate",
-                 f"{args.experiment_name}_LR: warm-up + cosine decay",
-                 str(plot_dir / f"{args.experiment_name}_lr.png"),
-                 learning_rates, )
-        # if args.ssl_type == "simclr":
+        plot_fig(xlabel="Epoch", ylabel="Mean NT-Xent Loss", title=f"SimCLR Training Loss",
+                 savefig=str(plot_dir / f"{args.experiment_name}_loss.png"), train_data=train_losses, )
+        plot_fig(xlabel="Training step", ylabel="Learning rate",
+                 title=f"LR: warm-up + cosine decay",
+                 savefig=str(plot_dir / f"{args.experiment_name}_lr.png"),
+                 train_data=learning_rates, )
         torch.save(
             {
                 "model_state_dict": model_to_save.state_dict(),
@@ -149,24 +128,4 @@ def run_pretraining(args, runtime: Runtime):
                 "config": model_to_save.get_config()
             },
             checkpoint_path, )
-        torch.save(model_to_save.encoder.state_dict(), encoder_path)
-        # elif args.ssl_type == "simclrv2":
-        #     torch.save(
-        #         {
-        #             "model_state_dict": model_to_save.state_dict(),
-        #             "optimizer_state_dict": optimizer.state_dict(),
-        #             "epochs": num_epochs,
-        #             "global_step": global_step,
-        #             "model_config": {
-        #                 "resnet_variant": args.model,
-        #                 "width_multiplier": args.width_multiplier,
-        #                 "use_sk": args.use_sk,
-        #                 "projection_dim": args.projection_dim,
-        #                 "small_image_stem": args.small_image_stem,
-        #             },
-        #         },
-        #         checkpoint_path,
-        #     )
-
         print(f"Checkpoint saved to: {checkpoint_path}")
-        # print(f"Encoder saved to: {encoder_path}")
