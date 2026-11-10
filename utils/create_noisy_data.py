@@ -14,7 +14,6 @@ OUTPUT_DIR = BASE_DIR / Path(r"data")
 
 VAL_FRACTION = 0.20
 NOISE_LEVELS = [0.20, 0.70]
-
 SEED = 42
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 
@@ -107,7 +106,7 @@ def prepare_dataset():
         create_noisy_train(clean_samples=train_samples, classes=classes, destination=train_dir,
             noise_level=noise_level, seed=SEED + noise_percent)
 
+
+if __name__ == "__main__":
+    prepare_dataset()
     print("\nDataset preparation completed!")
-
-
-prepare_dataset()
