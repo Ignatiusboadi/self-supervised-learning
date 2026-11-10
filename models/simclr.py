@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from models.resnet import SimCLRResNetEncoder
 from models.projection_head import ProjectionHead
+from models.resnet import SimCLRResNetEncoder
 
 
 class SimCLR(nn.Module):
@@ -19,19 +19,12 @@ class SimCLR(nn.Module):
         self.feature_dim = self.encoder.feature_dim
         self.projection_dim = projection_dim
 
-    def encode(self, x):
-        return self.encoder(x)
-
-    def project(self, h):
-        return self.projector(h)
-
     def forward(self, x, return_features=False):
-        h = self.encode(x)
-        z = self.project(h)
+        h = self.encoder(x)
+        z = self.projector(h)
 
         if return_features:
             return h, z
-
         return z
 
     def get_config(self):
