@@ -1,4 +1,5 @@
 data/*
+methods
 outputs/*
 .DS_Store
 *.pth
