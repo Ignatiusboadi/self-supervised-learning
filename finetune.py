@@ -5,7 +5,7 @@ from pathlib import Path
 from data_pipeline.finetuning_data import get_finetuning_loaders
 from training.finetuning import load_pretrained, fit_finetuning
 from utils.distributed import Runtime
-from utils.evaluation import evaluate_model
+from evaluation.evaluation import evaluate_model
 from utils.plotting import plot_fig
 from data_pipeline.gpu_finetune_data import get_finetuning_loaders_gpu
 from models.classifier import SimCLRClassifier
