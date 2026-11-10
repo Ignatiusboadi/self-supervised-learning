@@ -12,7 +12,7 @@ def build_parser():
         help="Training workflow to execute", )
     parser.add_argument("--ssl-type", default="simclr", choices=["simclr", "simclrv2"])
     parser.add_argument("--resnet-variant",
-                        choices=["resnet18", "resnet34", "resnet50", "resnet101", "resnet134"],
+                        choices=["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"],
                         default="resnet18", help="Backbone architecture", )
     parser.add_argument("--dataset", type=str, default="cifar10", help="Dataset name", )
     parser.add_argument("--data-path", type=str, default=None,
