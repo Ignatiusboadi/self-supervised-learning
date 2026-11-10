@@ -9,7 +9,7 @@ from data_pipeline.gpu_pretrain_data import get_simclr_pretraining_loader
 from utils.distributed import Runtime, setup_runtime, wrap_model
 from utils.optimizers import LARS, SAM
 from utils.plotting import plot_fig
-from training.train import train_one_epoch
+from training.pretraining import train_one_epoch
 from models.simclr import SimCLR
 
 
