@@ -1,172 +1,175 @@
-# Self-Supervised Learning with SimCLR
+# Self-Supervised Visual Representation Learning
 
-A PyTorch research project exploring **self-supervised visual representation learning** using SimCLR and downstream image classification. The project investigates how model architecture, optimization strategies, training-data availability, class imbalance, and label noise affect representation quality and classification performance.
+A PyTorch research codebase implementing **SimCLR v1 and SimCLR v2** for self-supervised visual representation learning and downstream image classification. The project also investigates the effects of training-data availability, class imbalance, and label noise on learned representations. An sparse-feature learning pipeline is also explored.
 
-## Features
+## Overview
 
-- **SimCLR pretraining** for learning visual representations from augmented image views.
-- **ResNet-18 and ResNet-50** encoder architectures.
-- **Linear probing and fine-tuning** of pretrained encoders.
-- Multiple fine-tuning strategies: `linear_probe`, `full`, `freeze_then_full`, and `partial`.
-- Optimization experiments using SGD, Adam, AdamW, LARS, and Sharpness-Aware Minimization (SAM).
-- Experiments with different training-data fractions, class imbalance, and noisy labels.
-- Training and validation plots, checkpoints, and evaluation summaries.
-- PyTorch Distributed Data Parallel (DDP) workflows for multi-GPU training.
+The repository implements a configurable SimCLR pipeline. The model variant is determined by the encoder and projection-head configuration:
 
-## Datasets
+- **SimCLR v1:** Standard ResNet encoder and a 2-layer projection head.
+- **SimCLR v2:** ResNet encoder with Selective Kernel (SK) blocks, wider widths, and a 3-layer projection head.
 
-The project focuses on:
+These variants share the same training pipeline. The architecture is configured using `--use-sk` and `--projection-layers`.
 
-- **CIFAR-10**
-- **CIFAR-100**
+The implementation supports ResNet-18, ResNet-34, ResNet-50, ResNet-101, and ResNet-152, alongside SGD, Adam, AdamW, LARS, and SAM optimizers.
 
-Dataset paths and training configurations can be specified through command-line arguments.
+## Repository Structure
 
-## Methodology
-
-### SimCLR Pretraining
-
-SimCLR learns representations by generating two augmented views of each image and training an encoder to produce similar representations for those views.
-
-The model consists of an **encoder** for extracting image features and a **projection head** for contrastive learning. The pretrained encoder is subsequently used for downstream classification.
-
-### Downstream Evaluation
-
-The project supports several transfer-learning strategies:
-
-- **Linear probing:** Freeze the encoder and train a linear classifier.
-- **Full fine-tuning:** Train the encoder and classification head together.
-- **Freeze-then-full:** Train the classification head with the encoder frozen, then unfreeze the encoder.
-- **Partial fine-tuning:** Update a subset of model parameters.
-
-### Optimization and Data Experiments
-
-Experiments investigate the effects of optimizer choice, batch size, model architecture, training-data availability, class imbalance, and label noise on model performance.
+```text
+.
+├── data_pipeline/   # Datasets, augmentations, and data loaders
+├── evaluation/      # Classification metrics and evaluation
+├── models/          # ResNet, SimCLR, classifier, and CSR models
+├── training/        # Pretraining and fine-tuning loops
+├── utils/           # Losses, optimizers, schedulers, and utilities
+├── pretrain.py      # SimCLR pretraining
+├── finetune.py      # Downstream classification
+├── csr_pipeline.py  # Sparse-feature learning
+└── run.py           # Main command-line interface
+```
 
 ## Installation
 
-Create and activate a virtual environment, then install the dependencies:
-
 ```bash
 python -m venv .venv
-```
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-Linux/macOS:
-
-```bash
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Install dependencies using `requirements.txt` if it is present in the repository.
+For Windows, activate the environment using:
 
-## Usage
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-The unified entry point is `run.py`.
+The supplied requirements specify CUDA-enabled PyTorch packages. For CPU or Apple Silicon, install a compatible PyTorch/torchvision version using the [official installation guide](https://pytorch.org/get-started/locally/).
 
-View available options:
+## Dataset Format
+
+The data loaders use `torchvision.datasets.ImageFolder`. Arrange images into class-specific directories:
+
+```text
+data/cifar10/
+├── train/
+│   ├── class_1/
+│   └── class_2/
+├── val/
+│   ├── class_1/
+│   └── class_2/
+└── test/
+    ├── class_1/
+    └── class_2/
+```
+
+The validation directory is optional; when absent, a validation split is created from the training data.
+
+For SimCLR pretraining, `--data-path` should point directly to the directory containing the class folders (e.g. `data/cifar10/train`). Class labels are not used in the contrastive learning objective.
+
+## Running Experiments
+
+Use the main entry point to inspect available arguments:
 
 ```bash
 python run.py --help
 ```
 
-### SimCLR Pretraining
+### SimCLR v1 Pretraining
 
 ```bash
 python run.py \
     --mode pretrain \
-    --model resnet18 \
+    --experiment-name simclr_v1_resnet18_pretraining \
+    --data-path ./data/cifar10/train \
+    --resnet-variant resnet18 \
+    --projection-layers 2 \
+    --optimizer lars \
+    --batch-size 1024 \
+    --epochs 100
+```
+
+### SimCLR v2 Pretraining
+
+```bash
+python run.py \
+    --mode pretrain \
+    --experiment-name simclr_v2_resnet18_pretraining \
+    --data-path ./data/cifar10/train \
+    --resnet-variant resnet18 \
+    --use-sk \
+    --width-multiplier 2 \
+    --projection-layers 3 \
     --optimizer lars \
     --batch-size 256 \
     --epochs 100
 ```
 
-### Fine-Tuning
+The `--use-sk` flag enables Selective Kernel blocks, while `--projection-layers` determines the projection-head depth. Model configurations are stored in checkpoints and are used to re-create model for downstream experiments.
+
+### Downstream Fine-tuning
 
 ```bash
 python run.py \
     --mode finetune \
-    --model resnet18 \
-    --checkpoint path/to/checkpoint.pth \
-    --strategy full
+    --experiment-name cifar10_finetune \
+    --dataset cifar10 \
+    --data-path ./data/cifar10 \
+    --checkpoint ./outputs/checkpoints/simclr/simclr_v1_resnet18_pretraining_checkpoint.pth \
+    --strategies linear_probe full \
+    --epochs 100
 ```
 
-### Linear Probing
+Available strategies:
+
+- `linear_probe`: Freeze the encoder and train the classification head.
+- `full`: Train the encoder and classification head.
+- `freeze_then_full`: Initially freeze the encoder, then unfreeze it.
+- `partial`: Train the final ResNet stage and classification head.
+
+### Sparse Feature Learning (CSR)
 
 ```bash
 python run.py \
-    --mode finetune \
-    --model resnet18 \
-    --checkpoint path/to/checkpoint.pth \
-    --strategy linear_probe
+    --mode csr \
+    --experiment-name cifar10_csr \
+    --dataset cifar10 \
+    --data-path ./data/cifar10 \
+    --checkpoint ./outputs/checkpoints/simclr/simclr_v1_resnet18_pretraining_checkpoint.pth
 ```
-### Distributed Training (Multi-GPU)
 
-The project supports distributed training workflows using PyTorch Distributed Data Parallel (DDP). Use `torchrun` to launch one training process per GPU.
+The CSR pipeline extracts pretrained features, trains a Top-K sparse autoencoder, and uses the resulting representations for downstream classification. CSR does not currently support distributed training.
 
-**Single machine with multiple GPUs**
+### Multi-GPU Training
 
-SimCLR pretraining:
+Pretraining and fine-tuning support CUDA Distributed Data Parallel (DDP). For example, to use two GPUs:
 
 ```bash
 torchrun --standalone --nproc_per_node=2 run.py \
     --mode pretrain \
-    --model resnet50 \
-    --optimizer lars \
-    --batch-size 256 \
+    --experiment-name simclrv1_ddp \
+    --data-path ./data/cifar10/train \
+    --device cuda \
+    --batch-size 512 \
     --epochs 100
 ```
 
-Fine-tuning:
+## Outputs
 
-```bash
-torchrun --standalone --nproc_per_node=2 run.py \
-    --mode finetune \
-    --model resnet18 \
-    --checkpoint path/to/checkpoint.pth \
-    --strategy full \
-    --epochs 50
-```
-
-**Parameters**
-
-- `--nproc_per_node=4`: launches four processes, typically one per GPU.
-- `--standalone`: configures distributed rendezvous for a single machine.
-- `--batch-size`: In DDP data loading, it is usually the per-process batch size, making the effective batch size approximately `batch size × number of GPUs`.
-
-Change the number of processes to match the GPUs available, for example, `--nproc_per_node=2` for two GPUs.
-
-These commands illustrate the CLI; adjust dataset paths and training parameters to match your configuration.
-
-## Evaluation
-
-Depending on the experiment, evaluation includes:
-
-- Accuracy and cross-entropy loss
-- Balanced accuracy
-- Macro-F1 and weighted F1
-- Per-class precision and recall
-- Confusion matrices
-
-Validation data is used for model selection, while the held-out test set is reserved for final evaluation.
+Checkpoints, training plots, and experiment summaries are saved under `outputs/` by default. Use `--output-dir` to specify another location.
 
 ## Current Scope
 
 The project focuses on SimCLR pretraining, downstream transfer learning, optimization comparisons, and experiments involving data availability and data quality.
 
-**Future work** includes SimCLR v2 and MoCo reproduction and more systematic comparisons of model capacity, batch size, and representation quality.
+**Future work** includes MoCo and SimSiam reproduction with assessment on MRI and CT scans.
 
-## Reference
+## References
 
 - Chen, T., Kornblith, S., Norouzi, M., and Hinton, G. (2020). [A Simple Framework for Contrastive Learning of Visual Representations](https://arxiv.org/abs/2002.05709). *ICML 2020*.
 
 - Foret, P., Kleiner, A., Mobahi, H., & Neyshabur, B. (2020). [Sharpness-aware minimization for efficiently improving generalization](https://arxiv.org/abs/2010.01412). *arXiv preprint arXiv:2010.01412*.
 
 - You, Y., Gitman, I., & Ginsburg, B. (2017). [Large batch training of convolutional networks](https://arxiv.org/abs/1708.03888). *arXiv preprint arXiv:1708.03888*.
+
+- Chen, T., Kornblith, S., Swersky, K., Norouzi, M., & Hinton, G. E. (2020). [Big self-supervised models are strong semi-supervised learners](https://arxiv.org/abs/2006.10029). *Advances in Neural Information Processing Systems*, *33*, 22243–22255.
+
+- Wen, T., Wang, Y., Zeng, Z., Peng, Z., Su, Y., Liu, X., Chen, B., Liu, H., Jegelka, S., & You, C. (2025). [Beyond Matryoshka: Revisiting Sparse Coding for Adaptive Representation](https://arxiv.org/abs/2503.01776). *Proceedings of the 42nd International Conference on Machine Learning*, 267, 66520–66538.
