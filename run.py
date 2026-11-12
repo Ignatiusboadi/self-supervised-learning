@@ -19,6 +19,7 @@ def build_parser():
                         help="Dataset directory; defaults depend on the mode", )
     parser.add_argument("--image-size", type=int, default=None,
                         help="Image size, use dataset default if omitted")
+    parser.add_argument("--root-dir", type=str, default=".")
     parser.add_argument("--output-dir", type=str, default=None,
         help="Root directory for checkpoints, plots, and results", )
     parser.add_argument("--train-cache-path", type=str, default=None,
@@ -45,7 +46,7 @@ def build_parser():
     parser.add_argument("--data-fraction", type=float, nargs="+", default=[1.0],
         help="One or more training fractions, e.g. 1.0 0.5", )
     parser.add_argument("--strategies", nargs="+",
-                        choices=["full", "freeze_then_full", "linear_probe", "partial"], default=None,
+                        choices=["full", "freeze_then_full", "linear_probe", "partial"], default=["full"],
                         help="Run one or multiple fine-tuning strategy(ies)", )
     parser.add_argument("--width-multiplier", type=int, default=1)
     parser.add_argument("--use-sk", action="store_true", )
