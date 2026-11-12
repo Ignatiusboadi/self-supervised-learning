@@ -42,7 +42,7 @@ def run_finetuning(args, runtime: Runtime):
     learning_rate = args.learning_rate if args.learning_rate is not None else 0.001
     weight_decay = args.weight_decay if args.weight_decay is not None else 5e-4
     optimizer_name = args.optimizer or "adamw"
-    strategies = args.strategies or [args.strategy]
+    strategies = args.strategies
 
     config = {"resnet_variant": args.resnet_variant, "width_multiplier": args.width_multiplier,
               "use_sk": args.use_sk, "small_image_stem": args.small_image_stem,
