@@ -9,7 +9,7 @@ The repository implements a configurable SimCLR pipeline. The model variant is d
 - **SimCLR v1:** Standard ResNet encoder and a 2-layer projection head.
 - **SimCLR v2:** ResNet encoder with Selective Kernel (SK) blocks, wider widths, and a 3-layer projection head.
 
-These variants share the same training pipeline. The architecture is configured using `--use-sk` and `--projection-layers`.
+These variants share the same training pipeline. The v2 architecture is configured using `--use-sk`, `--width-multipliers`, and `--projection-layers`.
 
 The implementation supports ResNet-18, ResNet-34, ResNet-50, ResNet-101, and ResNet-152, alongside SGD, Adam, AdamW, LARS, and SAM optimizers.
 
