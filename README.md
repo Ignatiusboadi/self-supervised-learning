@@ -1,6 +1,6 @@
 # Self-Supervised Visual Representation Learning
 
-A PyTorch research codebase implementing **SimCLR v1 and SimCLR v2** for self-supervised visual representation learning and downstream image classification. The project also investigates the effects of training-data availability, class imbalance, and label noise on learned representations. An sparse-feature learning pipeline is also explored.
+A PyTorch research codebase implementing **SimCLR v1 and SimCLR v2** for self-supervised visual representation learning and downstream image classification. The project also investigates the effects of training-data availability, class imbalance, and label noise on learned representations. A sparse-feature learning pipeline is also explored.
 
 ## Overview
 
