@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pathlib import Path
 from tqdm import tqdm
 from models.simclr import SimCLR
 
@@ -132,8 +133,8 @@ def extract(backbone, x):
 
 
 def train_csr(backbone, train_loader, d, h=None, k=32,
-              gamma=1.0, epochs=10, lr=4e-5,
-              k_aux=512, beta=1 / 32, device="cuda"):
+              gamma=1.0, epochs=10, lr=4e-5, k_aux=512, beta=1 / 32, device="cuda",
+              output_dir="./outputs"):
     h = h or 4 * d
     backbone = backbone.to(device).eval()
     backbone.requires_grad_(False)
@@ -211,7 +212,13 @@ def train_csr(backbone, train_loader, d, h=None, k=32,
             f"NCL: {total_ncl / num_batches:.4f} "
             f"Dead: {sae.dead_mask().float().mean().item():.3f}"
         )
-
+    torch.save({
+        "sae_state_dict": sae.state_dict(),
+        "input_dim": sae.input_dim,
+        "hidden_dim": sae.hidden_dim,
+        "k": sae.k,
+        "dead_steps": sae.dead_steps,
+    }, Path(output_dir) / "topk_sae.pth")
     return sae
 
 
