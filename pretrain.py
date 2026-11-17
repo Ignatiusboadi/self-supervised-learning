@@ -14,12 +14,11 @@ from models.simclr import SimCLR
 
 
 def run_pretraining(args, runtime: Runtime):
-    output_root = Path(args.output_dir or f"{args.root_dir}/outputs")
-    checkpoint_dir = output_root / "checkpoints" / args.ssl_type
-    plot_dir = output_root / "plots" / args.ssl_type
+    # output_root = Path(args.output_dir or f"{args.root_dir}/outputs")
+    checkpoint_dir = Path(args.output_dir) / "checkpoints"
+    plot_dir = Path(args.plot_dir)  # output_root / "plots" / args.ssl_type
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    plot_dir.mkdir(parents=True, exist_ok=True)
 
     num_epochs = args.epochs if args.epochs else 100
     batch_size = args.batch_size if args.batch_size else 512

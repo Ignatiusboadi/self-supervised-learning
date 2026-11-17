@@ -134,7 +134,7 @@ def extract(backbone, x):
 
 def train_csr(backbone, train_loader, d, h=None, k=32,
               gamma=1.0, epochs=10, lr=4e-5, k_aux=512, beta=1 / 32, device="cuda",
-              output_dir="./outputs"):
+              output_dir="./outputs", experiment_name="CSR"):
     h = h or 4 * d
     backbone = backbone.to(device).eval()
     backbone.requires_grad_(False)
@@ -214,11 +214,11 @@ def train_csr(backbone, train_loader, d, h=None, k=32,
         )
     torch.save({
         "sae_state_dict": sae.state_dict(),
-        "input_dim": sae.input_dim,
-        "hidden_dim": sae.hidden_dim,
-        "k": sae.k,
+        "d": sae.d,
+        "h": sae.h,
+        "k": k,
         "dead_steps": sae.dead_steps,
-    }, Path(output_dir) / "topk_sae.pth")
+    }, Path(output_dir) / experiment_name / f"topk_sae.pth")
     return sae
 
 

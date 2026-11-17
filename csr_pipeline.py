@@ -12,12 +12,9 @@ def run_csr(args, runtime):
     device = runtime.device
     root = Path(args.root_dir)
 
-    base_output_dir = Path(args.output_dir or root / "outputs")
-    plot_dir = base_output_dir / "plots"
-    output_root = base_output_dir / "csr_outputs"
-
-    plot_dir.mkdir(parents=True, exist_ok=True)
-    output_root.mkdir(parents=True, exist_ok=True)
+    # base_output_dir = Path(args.output_dir or root / "outputs")
+    plot_dir = Path(args.plot_dir) # base_output_dir / "plots"
+    output_root = Path(args.output_dir) # base_output_dir / "csr_outputs"
 
     data_dir = Path(args.data_path or root / "data" / args.dataset)
 
@@ -77,6 +74,8 @@ def run_csr(args, runtime):
         k_aux=args.csr_auxk,
         beta=args.csr_beta,
         device=device,
+        output_dir=args.output_dir,
+        experiment_name=args.experiment_name
     )
 
     classifier = train_classifier(

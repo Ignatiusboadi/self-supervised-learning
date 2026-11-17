@@ -14,12 +14,9 @@ from models.classifier import SimCLRClassifier
 def run_finetuning(args, runtime: Runtime):
     device = runtime.device
     root = Path(args.root_dir)
-    base_output_dir = Path(args.output_dir or root / "outputs")
-    plot_dir = base_output_dir / "plots"
-    output_root = base_output_dir / "finetuning_outputs"
-
-    plot_dir.mkdir(parents=True, exist_ok=True)
-    output_root.mkdir(parents=True, exist_ok=True)
+    # base_output_dir = Path(args.output_dir or root / "outputs")
+    plot_dir = args.plot_dir
+    output_root = args.output_dir # base_output_dir / "finetuning_outputs"
 
     data_dir = Path(args.data_path or root / "data" / args.dataset)
 
@@ -53,7 +50,7 @@ def run_finetuning(args, runtime: Runtime):
 
     for strategy in strategies:
         for fraction in args.data_fraction:
-            output_dir = output_root / args.experiment_name
+            output_dir = Path(output_root) / args.experiment_name
             output_dir.mkdir(parents=True, exist_ok=True)
 
             print("\n" + "=" * 70)
@@ -99,17 +96,17 @@ def run_finetuning(args, runtime: Runtime):
 
             plot_fig("Epoch", "Validation Loss",
                      f"Fine-Tuning training & validation Loss",
-                     str(plot_dir / f"{args.ssl_type}/{args.experiment_name}_{strategy}_{fraction}_val_loss.png"),
+                     Path(plot_dir) / f"{args.ssl_type}/{args.experiment_name}_{strategy}_{fraction}_val_loss.png",
                      train_data=history["train_loss"], val_data=history["val_loss"])
 
             plot_fig("Epoch", "Validation F1 (macro-average) (%)",
                      f"Fine-Tuning validation F1 Macro-average",
-                     str(plot_dir / f"{args.ssl_type}/{args.experiment_name}_{strategy}_{fraction}_val_f1_macro.png"),
+                     Path(plot_dir) / f"{args.ssl_type}/{args.experiment_name}_{strategy}_{fraction}_val_f1_macro.png",
                      val_data=history["val_macro_f1"])
 
             metrics = evaluate_model(
                 model=model, test_loader=test_loader, classes=classes, device=device,
-                checkpoint_path=output_dir / f"best_model.pth",
+                checkpoint_path=Path(output_dir) / f"best_model.pth",
             )
 
             results = {
@@ -135,7 +132,7 @@ def run_finetuning(args, runtime: Runtime):
             )
 
             if is_main_process:
-                with open(output_dir / f"{args.experiment_name}_{strategy}_{fraction}_results.json", "w") as f:
+                with open(Path(output_dir) / f"{args.experiment_name}_{strategy}_{fraction}_results.json", "w") as f:
                     json.dump(results, f, indent=2)
 
             all_results.append(results)
@@ -156,7 +153,7 @@ def run_finetuning(args, runtime: Runtime):
         for result in all_results
     ]
 
-    summary_path = output_root / f"{args.experiment_name}_summary.json"
+    summary_path = Path(output_root) / f"{args.experiment_name}_summary.json"
 
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)

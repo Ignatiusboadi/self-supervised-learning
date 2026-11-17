@@ -1,7 +1,11 @@
 import argparse
+import os
 import torch
 
+from dotenv import load_dotenv
+from pathlib import Path
 from utils.distributed import setup_runtime, cleanup_runtime
+
 
 
 def build_parser():
@@ -19,9 +23,9 @@ def build_parser():
                         help="Dataset directory; defaults depend on the mode", )
     parser.add_argument("--image-size", type=int, default=None,
                         help="Image size, use dataset default if omitted")
-    parser.add_argument("--root-dir", type=str, default=".")
-    parser.add_argument("--output-dir", type=str, default=None,
-        help="Root directory for checkpoints, plots, and results", )
+    # parser.add_argument("--root-dir", type=str, default=".")
+    # parser.add_argument("--output-dir", type=str, default=None,
+    #     help="Root directory for checkpoints, plots, and results", )
     parser.add_argument("--train-cache-path", type=str, default=None,
                         help="path for uint train cache", )
     parser.add_argument("--val-cache-path", type=str, default=None, help="path for uint val cache", )
@@ -76,6 +80,14 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
+    args.root_dir = Path(__file__).parent
+    args.output_dir = os.path.join(args.root_dir, "outputs", args.mode)
+    args.plot_dir = os.path.join(args.root_dir, "outputs", "plots")
+    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.plot_dir, exist_ok=True)
+    print("Outputs are saved to", args.output_dir)
+    print("Plots are saved to", args.plot_dir)
+
     runtime = setup_runtime(args.device)
 
     if args.epochs is not None and args.epochs < 1:
