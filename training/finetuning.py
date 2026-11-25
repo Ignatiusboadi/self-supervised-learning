@@ -18,52 +18,38 @@ import torch
 
 def load_pretrained(checkpoint_path, num_classes=10, config=None):
     checkpoint_path = Path(checkpoint_path)
-
     if not checkpoint_path.is_file():
         raise FileNotFoundError(f"Pretrained checkpoint not found: {checkpoint_path}")
-
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True, )
     if not config:
         config = checkpoint["config"]
     config = {k: v for k, v in config.items() if k != "feature_dim"}
     model = SimCLRClassifier(num_classes=num_classes, **config, )
     full_state_dict = checkpoint["model_state_dict"]
-
     encoder_state_dict = {key.removeprefix("encoder."): value for key, value in full_state_dict.items()
                           if key.startswith("encoder.")}
-
     if not encoder_state_dict:
         raise ValueError("No encoder weights found in the checkpoint.")
-
-    model.encoder.load_state_dict(
-        encoder_state_dict,
-        strict=True,
-    )
-
+    model.encoder.load_state_dict(encoder_state_dict, strict=True,)
     print(f"Loaded pretrained encoder: {checkpoint_path}")
     print(f"Architecture configuration: {config}")
 
-    return model
+    return model, config
 
 
 def configure_trainable_layers(model, strategy, unfreeze_backbone=False, ):
     model = model.module if hasattr(model, "module") else model
-
     for parameter in model.parameters():
         parameter.requires_grad = False
-
     for parameter in model.fc.parameters():
         parameter.requires_grad = True
-
     if strategy == "full":
         for parameter in model.encoder.parameters():
             parameter.requires_grad = True
-
     elif strategy == "freeze_then_full":
         if unfreeze_backbone:
             for parameter in model.encoder.parameters():
                 parameter.requires_grad = True
-
     elif strategy == "partial":
         for parameter in model.encoder.layer4.parameters():
             parameter.requires_grad = True
@@ -113,14 +99,12 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch,
                 return loss
 
             optimizer.step(closure)
-
             logits = first_pass["logits"]
             loss = first_pass["loss"]
 
         else:
             logits = model(images)
             loss = criterion(logits, labels)
-
             loss.backward()
             optimizer.step()
 
@@ -128,7 +112,6 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch,
         running_loss += loss.item() * batch_size
         correct += (logits.argmax(dim=1) == labels).sum().item()
         total += batch_size
-
         progress.set_postfix(loss=f"{loss.item():.4f}", accuracy=f"{100.0 * correct / total:.2f}%", )
     return running_loss / total, 100.0 * correct / total
 
@@ -171,7 +154,8 @@ def evaluate_one_epoch(model, loader, criterion, device):
 
 def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_layer="encoder",
                    strategy="full", num_epochs=30, freeze_epochs=10, learning_rate=0.01, weight_decay=5e-4,
-                   opt_name="sgd", patience=10, min_delta=1e-3, ):
+                   opt_name="sgd", patience=10, min_delta=1e-3, num_classes=10,
+                   config=None):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -267,7 +251,7 @@ def fit_finetuning(model, train_loader, val_loader, device, output_dir, feature_
                     base_model.state_dict()
                 )
 
-                torch.save(best_state, best_path)
+                torch.save({"state_dict": best_state, "config": config, "num_classes": num_classes}, best_path)
             else:
                 epochs_without_improvement += 1
 

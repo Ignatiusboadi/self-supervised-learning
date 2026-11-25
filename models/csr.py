@@ -248,8 +248,8 @@ def load_simclr_encoder(checkpoint_path, device):
 
 
 def train_classifier(backbone, sae, clf_loader, val_loader,
-                     num_classes, k=32, epochs=30,
-                     lr=1e-3, device="cuda"):
+                     num_classes, k=32, epochs=30, lr=1e-3, device="cuda",
+                     output_dir="./outputs", experiment_name="CSR"):
     backbone = backbone.to(device).eval()
     backbone.requires_grad_(False)
 
@@ -262,7 +262,7 @@ def train_classifier(backbone, sae, clf_loader, val_loader,
         lr=lr,
         weight_decay=1e-4
     )
-
+    best_val_acc = 0
     for ep in range(epochs):
         clf.train()
         train_loss = 0.0
@@ -292,24 +292,30 @@ def train_classifier(backbone, sae, clf_loader, val_loader,
 
         with torch.no_grad():
             for x, y in val_loader:
-
                 x = x.to(device, non_blocking=True)
                 y = y.to(device, non_blocking=True)
-
                 z = sparse_features(backbone, sae, x, k)
                 logits = clf(z)
-
                 loss = F.cross_entropy(logits, y)
-
                 val_loss += loss.item() * y.size(0)
                 val_correct += (logits.argmax(1) == y).sum().item()
                 val_n += y.size(0)
+                val_acc = val_correct / val_n
+                val_loss /= val_n
 
-        print(
-            f"[CLF] Epoch {ep + 1}/{epochs} "
-            f"Train Loss: {train_loss / train_n:.4f} "
-            f"Train Acc: {train_correct / train_n:.4f} "
-            f"Val Loss: {val_loss / val_n:.4f} "
+                if val_acc > best_val_acc:
+                    best_val_acc = val_acc
+                    torch.save({
+                        "classifier_state_dict": clf.state_dict(),
+                        "num_classes": num_classes,
+                        "input_dim": sae.h,
+                        "k": k,
+                        "best_val_acc": best_val_acc,
+                        "epoch": ep + 1,
+                    }, Path(output_dir) / experiment_name / "topk_clf.pth")
+
+        print(f"[CLF] Epoch {ep + 1}/{epochs} Train Loss: {train_loss / train_n:.4f} "
+            f"Train Acc: {train_correct / train_n:.4f} Val Loss: {val_loss / val_n:.4f} "
             f"Val Acc: {val_correct / val_n:.4f}"
         )
 

@@ -1,5 +1,10 @@
 data/*
 methods
+Notebooks
+xai.py
+xai_csr.py
+xai_images.zip
+data_pipeline/__init__.py
 outputs/*
 .DS_Store
 *.pth
