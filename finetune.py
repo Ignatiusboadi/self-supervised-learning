@@ -17,7 +17,6 @@ def run_finetuning(args, runtime: Runtime):
     # base_output_dir = Path(args.output_dir or root / "outputs")
     plot_dir = args.plot_dir
     output_root = args.output_dir # base_output_dir / "finetuning_outputs"
-
     data_dir = Path(args.data_path or root / "data" / args.dataset)
 
     checkpoint_path = args.checkpoint
@@ -75,24 +74,16 @@ def run_finetuning(args, runtime: Runtime):
                     val_fraction=0.2, val_cache_path=args.val_cache_path)
             if args.from_scratch:
                 model = SimCLRClassifier(num_classes=args.num_classes, **config)
+                num_classes = args.num_classes
             else:
-                model = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
+                model, config = load_pretrained(checkpoint_path=str(checkpoint_path), num_classes=len(classes))
+                num_classes = len(classes)
 
             model, history = fit_finetuning(
-                model=model,
-                train_loader=train_loader,
-                val_loader=val_loader,
-                device=device,
-                output_dir=output_dir,
-                strategy=strategy,
-                num_epochs=num_epochs,
-                freeze_epochs=args.freeze_epochs,
-                patience=args.patience,
-                learning_rate=learning_rate,
-                weight_decay=weight_decay,
-                opt_name=optimizer_name,
-                feature_layer=args.feature_layer,
-            )
+                model=model, train_loader=train_loader, val_loader=val_loader, device=device, output_dir=output_dir,
+                strategy=strategy, num_epochs=num_epochs, freeze_epochs=args.freeze_epochs, patience=args.patience,
+                learning_rate=learning_rate, weight_decay=weight_decay, opt_name=optimizer_name,
+                feature_layer=args.feature_layer, config=config, num_classes=num_classes, )
 
             plot_fig("Epoch", "Validation Loss",
                      f"Fine-Tuning training & validation Loss",
