@@ -88,6 +88,8 @@ def run_csr(args, runtime):
         epochs=classifier_epochs,
         lr=args.classifier_learning_rate,
         device=device,
+        output_dir=args.output_dir,
+        experiment_name=args.experiment_name
     )
 
     model = CSRClassifier(
