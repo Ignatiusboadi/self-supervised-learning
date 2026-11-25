@@ -84,6 +84,7 @@ def main():
     args.output_dir = os.path.join(args.root_dir, "outputs", args.mode)
     args.plot_dir = os.path.join(args.root_dir, "outputs", "plots")
     os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(os.path.join(args.output_dir, args.experiment_name), exist_ok=True)
     os.makedirs(args.plot_dir, exist_ok=True)
     print("Outputs are saved to", args.output_dir)
     print("Plots are saved to", args.plot_dir)
